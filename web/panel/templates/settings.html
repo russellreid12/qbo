@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block mainClass %}small-wrapper{% endblock %}
+
+{% block content %}
+    <div>
+        <h1 class="primary-color center">Settings</h1>
+
+        <form action="#" method="post">
+            {% csrf_token %}
+            {% include 'form/materialize-form.html' %}
+            <button type="submit" class="waves-effect waves-light btn" name="save">
+                <i class="material-icons left">save</i>
+                {% trans 'Save' %}
+            </button>
+
+            <button type="submit" class="waves-effect waves-light btn" name="save-and-restart">
+                <i class="material-icons left">refresh</i>
+                {% trans 'Save and restart' %}
+            </button>
+            {% if showUpgrade %}
+                <a href="{% url 'upgrade' %}" class="btn waves-effect waves-light">
+                    <i class="material-icons left">update</i>
+                    {% trans 'Upgrade' %}
+                </a>
+            {% endif %}
+        </form>
+    </div>
+{% endblock %}

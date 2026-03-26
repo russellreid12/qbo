@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block content %}
+    <div class="flow-text center-block">
+
+        <h1 class="primary-color">{% trans 'Upgrade' %}</h1>
+
+        {% if changelog %}
+            <p id="version-text">
+                {% trans 'Last changes' %}
+            </p>
+
+            {# Change list #}
+            <ul class="bullet-list changelog">
+                {% for change in changelog %}
+                    {% if change.strip %}
+                        <li>{{ change }}</li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+
+            {# Upgrade action #}
+            <form action="{% url 'updating' %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="waves-effect waves-light btn">
+                    <i class="material-icons left">cloud_download</i>
+                    {% trans 'Upgrade' %}
+                </button>
+            </form>
+
+        {% else %}
+            {% trans 'Congratulations, Qbo is updated to the latest version' %}
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block homeButton %}
+    {% if backSettings %}
+        <a id="back-button" href="{% url 'settings' %}" class="btn waves-effect waves-light primary-bg-color">
+            <i class="material-icons left">settings</i>
+            {% trans 'Settings' %}
+        </a>
+    {% else %}
+        <a id="back-button" href="{% url 'home' %}" class="btn waves-effect waves-light primary-bg-color">
+            <i class="material-icons left">home</i>
+            {% trans 'Home' %}
+        </a>
+    {% endif %}
+{% endblock %}

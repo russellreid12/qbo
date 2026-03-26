@@ -1,0 +1,15 @@
+[Unit]
+Description=QBO BLE Command Bridge
+After=bluetooth.target network.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/qbo
+ExecStart=/usr/bin/python3 /opt/qbo/BleCmdServer.py --adapter hci0 --name QBO-Command-Bridge
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

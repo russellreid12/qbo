@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block mainClass %}checkers-wrapper{% endblock %}
+
+{% block content %}
+    <iframe id="checkers-game" src="{% url 'checkers-game' %}" frameborder="0"></iframe>
+
+    <div class="white-text">
+        <p>Copyright 2016 Kevin Schuetz</p>
+
+        <p><a href="https://github.com/kschuetz/checkers">See in GitHub</a></p>
+
+        <p><a href="http://www.apache.org/licenses/LICENSE-2.0">Apache 2.0 License</a></p>
+    </div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block scripts %}
+    {{ block.super }}
+
+    {# Redirect to upgrade page after 1 min #}
+    <script type="text/javascript">
+        setTimeout(function () {
+            window.location = '{% url 'updating' %}'
+        }, 120000);
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="center-block">
+        <h1 class="primary-color">
+            {% trans 'Updating the system' %}
+        </h1>
+
+        <h4 class="primary-color margin-bottom-lg">
+            {% trans 'This may take several minutes. Please, do not turn me off.' %}
+        </h4>
+
+        <div class="small-wrapper">
+            <div class="progress">
+                <div class="indeterminate"></div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

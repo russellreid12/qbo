@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block mainClass %}home{% endblock %}
+
+{% block stylesheets %}
+        <link type="text/css" rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700"/>
+        <link type="text/css" rel="stylesheet" href="{% static 'panel/css/materialize.min.css' %}"/>
+        <link type="text/css" rel="stylesheet" href="{% static 'panel/css/material-icons.css' %}"/>
+        <link type="text/css" rel="stylesheet" href="{% static 'panel/css/style-watson.css' %}"/>
+{% endblock %}
+
+{% block content %}{% endblock %}
+
+{% block homeButton %}
+    <a id="settings-watson" href="{% url 'settings' %}">
+        <i class="material-icons md-72">settings</i>
+    </a>
+{% endblock %}

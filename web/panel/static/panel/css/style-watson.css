@@ -1,0 +1,227 @@
+body {
+  margin: 0;
+}
+
+#main-wrapper > main {
+  min-height: 100vh;
+  padding: 2rem;
+  background-image: url(./../images/qbo.svg);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: 25% 50%;
+}
+#main-wrapper > main.home {
+  background-image: url(./../images/watson.gif);
+  background-size: cover;
+  background-position: center;
+}
+
+.home-welcome {
+  max-width: 80%;
+  width: 400px;
+  height: auto;
+  display: block;
+  margin: 0 auto 4rem;
+}
+
+h1 {
+  font-weight: bold;
+}
+
+h4 {
+  color: #004e89;
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+.primary-bg-color {
+  background-color: #004e89 !important;
+}
+
+.primary-color {
+  color: #004e89 !important;
+}
+
+.home-nav {
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+}
+.home-nav div {
+  width: 40%;
+}
+@media (min-width: 700px) {
+  .home-nav div {
+    width: 20%;
+  }
+}
+.home-nav div a img {
+  max-width: 100%;
+  max-height: 250px;
+  height: auto;
+  width: auto;
+}
+
+#menu-trigger {
+  position: absolute;
+  color: #7e7e7e;
+}
+#menu-trigger i {
+  margin: 1rem 1.5rem;
+}
+
+ul.bullet-list {
+  padding-left: 40px;
+}
+ul.bullet-list li {
+  list-style-type: circle;
+}
+ul.bullet-list.changelog {
+  font-size: 0.85em;
+}
+
+#version-text {
+  font-weight: bold;
+}
+#version-text span {
+  display: block;
+}
+@media (min-width: 30rem) {
+  #version-text span {
+    display: inline;
+  }
+  #version-text span + span {
+    margin-left: 4rem;
+  }
+}
+
+.checkers-wrapper {
+  position: relative;
+  background: black;
+  background-image: none !important;
+}
+
+#checkers-game {
+  width: calc(100% + 4rem);
+  height: 921px;
+  margin-left: -2rem;
+  margin-right: -2rem;
+}
+@media (max-width: 564px) {
+  #checkers-game {
+    height: 261px;
+  }
+}
+@media (min-width: 565px) and (max-width: 678px) {
+  #checkers-game {
+    height: 371px;
+  }
+}
+@media (min-width: 579px) and (max-width: 793px) {
+  #checkers-game {
+    height: 481px;
+  }
+}
+@media (min-width: 794px) and (max-width: 908px) {
+  #checkers-game {
+    height: 591px;
+  }
+}
+@media (min-width: 909px) and (max-width: 1024px) {
+  #checkers-game {
+    height: 701px;
+  }
+}
+@media (min-width: 1025px) and (max-width: 1139px) {
+  #checkers-game {
+    height: 811px;
+  }
+}
+
+.relative {
+  position: relative !important;
+}
+
+.small-wrapper {
+  width: 100%;
+  max-width: 35rem;
+  margin: 0 auto;
+}
+
+/** Materialize override */
+input:not([type]):focus:not([readonly]), input[type=text]:not(.browser-default):focus:not([readonly]), input[type=password]:not(.browser-default):focus:not([readonly]), input[type=email]:not(.browser-default):focus:not([readonly]), input[type=url]:not(.browser-default):focus:not([readonly]), input[type=time]:not(.browser-default):focus:not([readonly]), input[type=date]:not(.browser-default):focus:not([readonly]), input[type=datetime]:not(.browser-default):focus:not([readonly]), input[type=datetime-local]:not(.browser-default):focus:not([readonly]), input[type=tel]:not(.browser-default):focus:not([readonly]), input[type=number]:not(.browser-default):focus:not([readonly]), input[type=search]:not(.browser-default):focus:not([readonly]), textarea.materialize-textarea:focus:not([readonly]) {
+  border-bottom: 1px solid #004e89;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: #004e89;
+  -webkit-box-shadow: 0 1px 0 0 #004e89;
+  box-shadow: 0 1px 0 0 #004e89;
+}
+
+input:not([type]):focus:not([readonly]) + label, input[type=text]:not(.browser-default):focus:not([readonly]) + label, input[type=password]:not(.browser-default):focus:not([readonly]) + label, input[type=email]:not(.browser-default):focus:not([readonly]) + label, input[type=url]:not(.browser-default):focus:not([readonly]) + label, input[type=time]:not(.browser-default):focus:not([readonly]) + label, input[type=date]:not(.browser-default):focus:not([readonly]) + label, input[type=datetime]:not(.browser-default):focus:not([readonly]) + label, input[type=datetime-local]:not(.browser-default):focus:not([readonly]) + label, input[type=tel]:not(.browser-default):focus:not([readonly]) + label, input[type=number]:not(.browser-default):focus:not([readonly]) + label, input[type=search]:not(.browser-default):focus:not([readonly]) + label, textarea.materialize-textarea:focus:not([readonly]) + label {
+  color: #004e89;
+}
+
+.btn, .btn:hover {
+  background-color: #004e89;
+}
+
+.progress {
+  background-color: #eee;
+}
+.progress .indeterminate {
+  background-color: #004e89;
+}
+
+.valign-wrapper > * {
+  width: 100%;
+}
+
+/** END Materialize override **/
+.margin-bottom-med {
+  margin-bottom: 2rem;
+}
+
+.margin-bottom-lg {
+  margin-bottom: 4rem;
+}
+
+.card-panel.small-panel {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.card-panel.success {
+  background-color: #4CAF50;
+  color: white;
+}
+
+ul.errorlist li {
+  color: red;
+  font-weight: 500;
+}
+ul.errorlist li:before {
+  content: "* ";
+}
+
+#back-button {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 999;
+}
+
+#settings-watson {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 999;
+  color: white;
+}
+
+.material-icons.md-72 {
+  font-size: 72px;
+}
+
+/*# sourceMappingURL=style-watson.css.map */

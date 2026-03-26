@@ -1,0 +1,226 @@
+$primary-color: #004e89;
+$primary-color-ligth: #6ebcf7;
+$gray: #7e7e7e;
+
+body {
+  margin: 0;
+}
+
+#main-wrapper {
+  > main {
+    min-height: 100vh;
+    padding: 2rem;
+    background-image: url(./../images/qbo.svg);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: 25% 50%;
+
+    &.home {
+      background-image: url(./../images/watson.gif);
+      background-size: cover;
+      background-position: center;
+    }
+  }
+}
+
+.home-welcome {
+  max-width: 80%;
+  width: 400px;
+  height: auto;
+  display: block;
+  margin: 0 auto 4rem;
+}
+
+h1 {
+  font-weight: bold;
+}
+
+h4 {
+  color: $primary-color;
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+.primary-bg-color {
+  background-color: $primary-color !important;
+}
+
+.primary-color {
+  color: $primary-color !important;
+}
+
+.home-nav {
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+
+  div {
+    width: 40%;
+
+    @media (min-width: 700px) {
+      width: 20%;
+    }
+
+    a {
+      img {
+        max-width: 100%;
+        max-height: 250px;
+        height: auto;
+        width: auto;
+      }
+    }
+  }
+}
+
+#menu-trigger {
+  position: absolute;
+  color: $gray;
+
+  i {
+    margin: 1rem 1.5rem;
+  }
+}
+
+ul.bullet-list {
+  padding-left: 40px;
+
+  li {
+    list-style-type: circle;
+  }
+
+  &.changelog {
+    font-size: 0.85em;
+  }
+}
+
+#version-text {
+  font-weight: bold;
+
+  span {
+    display: block;
+
+    @media (min-width: 30rem) {
+      display: inline;
+
+      + span {
+        margin-left: 4rem;
+      }
+    }
+  }
+}
+
+.checkers-wrapper {
+  position: relative;
+  background: black;
+  background-image: none !important;
+}
+
+#checkers-game {
+  width: calc(100% + 4rem);
+  height: 921px;
+  margin-left: -2rem;
+  margin-right: -2rem;
+
+  @media (max-width: 564px) { height: 261px; }
+  @media (min-width: 565px) and (max-width: 678px) { height: 371px; }
+  @media (min-width: 579px) and (max-width: 793px) { height: 481px; }
+  @media (min-width: 794px) and (max-width: 908px) { height: 591px; }
+  @media (min-width: 909px) and (max-width: 1024px) { height: 701px; }
+  @media (min-width: 1025px) and (max-width: 1139px) { height: 811px; }
+}
+
+.relative {
+  position: relative !important;
+}
+
+.small-wrapper {
+  width: 100%;
+  max-width: 35rem;
+  margin: 0 auto;
+}
+
+/** Materialize override */
+input:not([type]):focus:not([readonly]), input[type=text]:not(.browser-default):focus:not([readonly]), input[type=password]:not(.browser-default):focus:not([readonly]), input[type=email]:not(.browser-default):focus:not([readonly]), input[type=url]:not(.browser-default):focus:not([readonly]), input[type=time]:not(.browser-default):focus:not([readonly]), input[type=date]:not(.browser-default):focus:not([readonly]), input[type=datetime]:not(.browser-default):focus:not([readonly]), input[type=datetime-local]:not(.browser-default):focus:not([readonly]), input[type=tel]:not(.browser-default):focus:not([readonly]), input[type=number]:not(.browser-default):focus:not([readonly]), input[type=search]:not(.browser-default):focus:not([readonly]), textarea.materialize-textarea:focus:not([readonly]) {
+  border-bottom: 1px solid $primary-color;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: $primary-color;
+  -webkit-box-shadow: 0 1px 0 0 $primary-color;
+  box-shadow: 0 1px 0 0 $primary-color;
+}
+
+input:not([type]):focus:not([readonly]) + label, input[type=text]:not(.browser-default):focus:not([readonly]) + label, input[type=password]:not(.browser-default):focus:not([readonly]) + label, input[type=email]:not(.browser-default):focus:not([readonly]) + label, input[type=url]:not(.browser-default):focus:not([readonly]) + label, input[type=time]:not(.browser-default):focus:not([readonly]) + label, input[type=date]:not(.browser-default):focus:not([readonly]) + label, input[type=datetime]:not(.browser-default):focus:not([readonly]) + label, input[type=datetime-local]:not(.browser-default):focus:not([readonly]) + label, input[type=tel]:not(.browser-default):focus:not([readonly]) + label, input[type=number]:not(.browser-default):focus:not([readonly]) + label, input[type=search]:not(.browser-default):focus:not([readonly]) + label, textarea.materialize-textarea:focus:not([readonly]) + label {
+  color: $primary-color;
+}
+
+.btn, .btn:hover {
+  background-color: $primary-color;
+}
+
+.progress {
+  background-color: #eee;
+
+  .indeterminate {
+    background-color: $primary-color;
+  }
+}
+
+.valign-wrapper {
+  > * {
+    width: 100%;
+  }
+}
+
+/** END Materialize override **/
+
+.margin-bottom-med {
+  margin-bottom: 2rem;
+}
+
+.margin-bottom-lg {
+  margin-bottom: 4rem;
+}
+
+.card-panel {
+  &.small-panel {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  &.success {
+    background-color: #4CAF50;
+    color: white;
+  }
+}
+
+ul.errorlist {
+  li {
+    color: red;
+    font-weight: 500;
+
+    &:before {
+      content: '* ';
+    }
+  }
+}
+
+#back-button {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 999;
+}
+
+#settings-watson {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 999;
+  color:white;
+}
+
+.material-icons.md-72 {
+  font-size: 72px;
+}

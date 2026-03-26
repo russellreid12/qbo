@@ -1,0 +1,13 @@
+pcm.!default {
+  type asym
+  capture.pcm "mic"
+  playback.pcm "speaker"
+}
+pcm.mic {
+  type plug
+  slave.pcm dmicQBO
+}
+pcm.speaker {
+  type plug
+  slave sl1
+}

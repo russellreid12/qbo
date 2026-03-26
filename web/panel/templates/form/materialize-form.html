@@ -1,0 +1,34 @@
+{% load i18n %}
+{% with normal_input="text number" %}
+    {% for field in form %}
+
+        {# Form group header #}
+        {% if field.name == 'tokenAPIai' %}
+            <h4>{% trans 'Google' %}</h4>
+        {% elif field.name == 'AssistantUsername' %}
+            <h4>{% trans 'IBM Watson' %}</h4>
+        {% endif %}
+
+        {# Field #}
+        <div class="margin-bottom-med">
+            {% if field.field.widget.input_type == 'checkbox' %}
+                {# Checkboxes #}
+                <label>
+                    {{ field }}
+                    <span class="black-text">{{ field.label }}</span>
+                </label>
+            {% else %}
+                {# Other types #}
+                <div class="input-field">
+                    {{ field }}
+                    {{ field.label_tag }}
+                </div>
+            {% endif %}
+
+            <div>
+                {{ field.errors }}
+            </div>
+        </div>
+    {% endfor %}
+
+{% endwith %}

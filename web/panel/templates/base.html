@@ -1,0 +1,59 @@
+{% load static %}
+{% load i18n %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>QBO</title>
+
+    {% block stylesheets %}
+        <link type="text/css" rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700"/>
+        <link type="text/css" rel="stylesheet" href="{% static 'panel/css/materialize.min.css' %}"/>
+        <link type="text/css" rel="stylesheet" href="{% static 'panel/css/material-icons.css' %}"/>
+        <link type="text/css" rel="stylesheet" href="{% static 'panel/css/style.css' %}"/>
+    {% endblock %}
+</head>
+
+<body>
+{% block base %}
+    <div id="main-wrapper">
+        <main class="valign-wrapper {% block mainClass %}{% endblock %}">
+            <div>
+                {% block messages %}
+                    {% if messages %}
+                        <ul class="messages">
+                            {% for message in messages %}
+                                <div class="
+                                    card-panel
+                                    small-panel
+                                    {% if message.tags %}{{ message.tags }}{% endif %}
+                                ">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endblock %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    {% block homeButton %}
+        <a id="back-button" href="{% url 'home' %}" class="btn waves-effect waves-light primary-bg-color">
+            <i class="material-icons left">home</i>
+            {% trans 'Home' %}
+        </a>
+    {% endblock %}
+{% endblock %}
+
+{% block scripts %}
+    <script type="text/javascript" src="{% static 'panel/js/materialize.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'panel/js/index.js' %}"></script>
+{% endblock %}
+</body>
+</html>

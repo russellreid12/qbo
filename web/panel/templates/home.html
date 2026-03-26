@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block homeButton %}{% endblock %}
+
+{% block mainClass %}home{% endblock %}
+
+{% block content %}
+    <div>
+        <img
+                class="home-welcome"
+                src="{% static 'panel/images/welcome.png' %}"
+                alt="Welcome One"
+        />
+
+        <div class="home-nav">
+            <div>
+                <a href="{% url 'checkers' %}">
+                    <img src="{% static 'panel/images/checkers_icon.png' %}" alt="{% trans 'Checkers' %}"/>
+                </a>
+            </div>
+
+            <div>
+                <a href="http://scratchx.org/?url={{ BASE_URL }}{% static 'scratch/robot_control.js' %}#scratch">
+                    <img src="{% static 'panel/images/scratch_icon.png' %}" alt="{% trans 'Scratch' %}"/>
+                </a>
+            </div>
+
+            <div>
+                <a href="{% url 'settings' %}">
+                    <img src="{% static 'panel/images/settings_icon.png' %}" alt="{% trans 'Settings' %}"/>
+                </a>
+            </div>
+
+            <div>
+                <a href="{% url 'upgrade' %}">
+                    <img src="{% static 'panel/images/update_icon.png' %}" alt="{% trans 'Upgrade' %}"/>
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

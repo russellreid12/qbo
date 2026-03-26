@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block stylesheets %}
+    <link type="text/css" rel="stylesheet" href="{% static 'checkers/css/main.min.css' %}"/>
+
+    <style>
+        #checkers-game-child {
+            text-align: center;
+        }
+
+        #root {
+            display: inline-block;
+        }
+    </style>
+{% endblock %}
+
+{% block scripts %}
+    <script type="text/javascript" src="{% static 'checkers/js/deps.js' %}"></script>
+    <script type="text/javascript" src="{% static 'checkers/js/main.js' %}"></script>
+{% endblock %}
+
+{% block base %}
+    <div id="checkers-game-child">
+        <div id="root"></div>
+        <div id="dialog-root"></div>
+    </div>
+{% endblock %}

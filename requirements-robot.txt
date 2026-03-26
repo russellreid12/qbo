@@ -1,0 +1,10 @@
+opencv-python
+pyserial
+PyYAML
+numpy
+SpeechRecognition
+sounddevice
+openwakeword
+
+# Optional / legacy dependencies:
+# - google-assistant-sdk, ibm-watson, dialogflow, mycroft-core (only if you enable those modes)

@@ -21,6 +21,8 @@ import wave
 import yaml
 from contextlib import contextmanager
 
+from qbo_audio import aplay_wav_device_quoted
+
 
 
 
@@ -451,9 +453,6 @@ class QBOtalk(object):
      vol = self.config["volume"]
      wav = "/opt/qbo/sounds/pico2wave.wav"
      mode = str(self.config.get("audioPlaybackMode", "plughw")).lower()
-     device = self.config.get("audioPlaybackDevice")
-     if device is None:
-         device = "convertQBO" if mode == "convertqbo" else "plughw:0,0"
 
 
 
@@ -500,7 +499,9 @@ class QBOtalk(object):
              "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
          ).format(gen=gen, wav=wav, hw=hw, g0=g0)
      else:
-         cmd = "{gen} && aplay -D {dev} {wav}".format(gen=gen, dev=device, wav=wav)
+         cmd = "{gen} && aplay -D {dev} {wav}".format(
+             gen=gen, dev=aplay_wav_device_quoted(self.config), wav=wav
+         )
 
 
 

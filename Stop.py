@@ -5,14 +5,17 @@ import time
 import yaml
 import subprocess
 
+from qbo_audio import aplay_wav_device_quoted
+
 config = yaml.safe_load(open("/opt/qbo/config.yml"))
+_aplay_d = aplay_wav_device_quoted(config)
 
 if config["language"] == "spanish":
 	text = "Adíos"
-	speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D convertQBO /opt/qbo/sounds/pico2wave.wav"
+	speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
 else:
 	text = "Good bye"
-	speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D convertQBO /opt/qbo/sounds/pico2wave.wav"
+	speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
 
 subprocess.call(speak, shell = True)
 time.sleep(0.5)

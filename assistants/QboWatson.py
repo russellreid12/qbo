@@ -18,6 +18,7 @@ from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 
 
 from VisualRecognition import VisualRecognition
+from qbo_audio import aplay_wav_device
 
 
 
@@ -158,7 +159,9 @@ class QBOWatson(object):
 
 
                        print("Started visual recognition")
-                       subprocess.call("aplay /opt/qbo/sounds/blip_0.wav", shell=True)
+                       subprocess.call(
+                           ["aplay", "-D", aplay_wav_device(self.config), "/opt/qbo/sounds/blip_0.wav"]
+                       )
 
 
                        self.vc.captureAndRecognizeImageWatson(self.webcam)
@@ -259,7 +262,9 @@ class QBOWatson(object):
                )
 
 
-           subprocess.call('aplay -D convertQBO /opt/qbo/sounds/watson.wav', shell=True)
+           subprocess.call(
+               ["aplay", "-D", aplay_wav_device(self.config), "/opt/qbo/sounds/watson.wav"]
+           )
        except Exception as e:
            print("WATSON SPEAK ERROR: %s" % e)
 

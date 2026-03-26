@@ -4,7 +4,10 @@ import subprocess
 import os
 import yaml
 
+from qbo_audio import aplay_wav_device_quoted
+
 config = yaml.safe_load(open("/opt/qbo/config.yml"))
+_aplay_d = aplay_wav_device_quoted(config)
 FIFO_say = '/opt/qbo/pipes/pipe_say'
 
 
@@ -24,9 +27,9 @@ def SayFromFile():
 			print('Read: "{0}"'.format(data))
 
 			if (config["language"] == "spanish"):
-				speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + data + "\" && aplay -D convertQBO /opt/qbo/sounds/pico2wave.wav"
+				speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + data + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
 			else:
-				speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + data + "\" && aplay -D convertQBO /opt/qbo/sounds/pico2wave.wav"
+				speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + data + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
 
 			print("say.py: " + speak)
 

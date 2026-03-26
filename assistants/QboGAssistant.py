@@ -7,6 +7,9 @@ import io
 import json
 import subprocess
 import threading
+import yaml
+
+from qbo_audio import aplay_wav_device
 
 
 class GAssistant(object):
@@ -23,6 +26,7 @@ class GAssistant(object):
 																	 **json.load(f))
 		self.deviceModelId = deviceModelId
 		self.debug = debug
+		self._qbo_config = yaml.safe_load(open("/opt/qbo/config.yml"))
 
 		# Create thread
 		self.thread = threading.Thread(target=self.run, args=())
@@ -61,7 +65,9 @@ class GAssistant(object):
 	def process_event(self, event):
 		if event.type == EventType.ON_CONVERSATION_TURN_STARTED:
 			if self.doBlip:
-				subprocess.call("aplay /opt/qbo/sounds/blip_0.wav", shell=True)
+				subprocess.call(
+					["aplay", "-D", aplay_wav_device(self._qbo_config), "/opt/qbo/sounds/blip_0.wav"]
+				)
 				self.doBlip = True
 			self.onConversation = True
 

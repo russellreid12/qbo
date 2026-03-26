@@ -12,6 +12,7 @@ import time
 import Speak
 import _thread
 import yaml
+from qbo_audio import aplay_wav_device
 from assistants.QboWatson import QBOWatson
 from assistants.QboTalk import QBOtalk
 from assistants.QboTalkMycroft import QBOtalkMycroft
@@ -558,7 +559,9 @@ def WaitForSpeech():
 
 
            print("Started visual recognition")
-           subprocess.call("aplay /opt/qbo/sounds/blip_0.wav", shell=True)
+           subprocess.call(
+               ["aplay", "-D", aplay_wav_device(config), "/opt/qbo/sounds/blip_0.wav"]
+           )
 
 
            # Capture + run both object detection AND face recognition together

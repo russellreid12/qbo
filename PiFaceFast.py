@@ -317,7 +317,7 @@ def stop_voice_recording():
 # Alpha closer to 0.0 = smoother but slower to react.
 # 0.4 balances responsiveness with PID-dampened stability.
 # ---------------------------------------------------------------------------
-_smooth_alpha = float(config.get("faceTrackingSmoothAlpha", 0.4))
+_smooth_alpha = float(config.get("faceTrackingSmoothAlpha", 0.85))
 _smoothed_cx = 160.0   # initialise to frame centre
 _smoothed_cy = 120.0
 
@@ -415,7 +415,7 @@ _dbg_state_names   = {TRACK_SEARCHING: "SEARCHING", TRACK_DETECTING: "DETECTING"
 
 # PID gains — tuned for ~5 FPS tracking loop on Pi 5
 # (old defaults 0.35/0.05/0.15/60 caused runaway at low FPS)
-_pid_kp = float(config.get("faceTrackingKp", 0.20))
+_pid_kp = float(config.get("faceTrackingKp", 0.35))
 _pid_ki = float(config.get("faceTrackingKi", 0.02))
 _pid_kd = float(config.get("faceTrackingKd", 0.08))
 _pid_integral_max = float(config.get("faceTrackingIntegralMax", 30.0))
@@ -950,7 +950,7 @@ while True:
        _dbg_miss_count += 1
 
 
-       if face_not_found_idx > 20:
+       if face_not_found_idx > 5:
            face_not_found_idx = 0
            lastface = 0
            face = [0, 0, 0, 0]

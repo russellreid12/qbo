@@ -1,13 +1,2 @@
-pcm.!default {
-  type asym
-  capture.pcm "mic"
-  playback.pcm "speaker"
-}
-pcm.mic {
-  type plug
-  slave.pcm dmicQBO
-}
-pcm.speaker {
-  type plug
-  slave sl1
-}
+# User-level ALSA overrides (intentionally empty).
+# All audio routing is handled by /etc/asound.conf.

@@ -1028,7 +1028,7 @@ while True:
 
            if abs(faceOffset_X) > _track_dead:
                pan_out = pid_pan.update(faceOffset_X, dt)
-               Xcoor = max(Xmin, min(Xmax, Xcoor + int(pan_out)))
+               Xcoor = max(Xmin, min(Xmax, Xcoor - int(pan_out)))
                controller.SetServo(1, Xcoor, _track_servo_speed)
                if _face_debug:
                    _track_dbg_n += 1

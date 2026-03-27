@@ -325,7 +325,7 @@ _smoothed_cy = 120.0
 # FIX: Tracked servo speed cap — use SetServo (with speed) instead of
 #      SetAngle (instant snap) so the motor can't accelerate past target.
 #      Range 10–100. Lower = slower but less overshoot on fast moves.
-_track_servo_speed = int(config.get("faceTrackingServoSpeed", 30))
+_track_servo_speed = int(config.get("faceTrackingServoSpeed", 100))
 
 
 if len(sys.argv) > 1:
@@ -394,7 +394,6 @@ _face_invert_tilt = _cfg_bool(config.get("faceTrackingInvertTilt"), False)
 _camera_flip_h    = _cfg_bool(config.get("cameraFlipHorizontal"),   False)
 _face_debug       = _cfg_bool(config.get("faceTrackingDebug"),      False)
 _face_debug_interval = int(config.get("faceTrackingDebugInterval", 10))  # print every N frames
-_track_dbg_n      = 0
 _track_dead       = int(config.get("faceTrackingDeadband", 12))
 _stabilize_sec    = float(config.get("faceTrackingStabilizeSec", 0.35))
 _face_stabilize_until = 0.0

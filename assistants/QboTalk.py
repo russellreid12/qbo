@@ -47,6 +47,23 @@ def _config_int_optional(config, key):
 
 
 @contextmanager
+def _suppress_c_stderr():
+    """PortAudio/ALSA/JACK log from C via fd 2; Python's redirect_stderr cannot hide it."""
+    if os.environ.get("QBO_VERBOSE_LIBS"):
+        yield
+        return
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    saved = os.dup(2)
+    try:
+        os.dup2(devnull, 2)
+        os.close(devnull)
+        yield
+    finally:
+        os.dup2(saved, 2)
+        os.close(saved)
+
+
+@contextmanager
 def open_microphone_source(mic):
   """
   Enter sr.Microphone safely. Some speech_recognition versions swallow
@@ -140,7 +157,9 @@ class QBOtalk(object):
      # device names used across different QBO hardware revisions.
      QBO_MIC_NAMES = ("dmicQBO_sv", "googlevoicehat", "voicehat")
      mic_index = None
-     for i, mic_name in enumerate(sr.Microphone.list_microphone_names()):
+     with _suppress_c_stderr():
+         mic_names = sr.Microphone.list_microphone_names()
+     for i, mic_name in enumerate(mic_names):
          if mic_name and any(known in mic_name.lower() for known in QBO_MIC_NAMES):
              mic_index = i
              break
@@ -154,18 +173,19 @@ class QBOtalk(object):
 
      try:
          if cfg_mic_index is not None:
-             self.m = sr.Microphone(
-                 device_index=cfg_mic_index, sample_rate=cfg_sample_rate
-             )
+             with _suppress_c_stderr():
+                 self.m = sr.Microphone(
+                     device_index=cfg_mic_index, sample_rate=cfg_sample_rate
+                 )
          elif mic_index is not None:
-             self.m = sr.Microphone(
-                 device_index=mic_index, sample_rate=cfg_sample_rate
-             )
+             with _suppress_c_stderr():
+                 self.m = sr.Microphone(
+                     device_index=mic_index, sample_rate=cfg_sample_rate
+                 )
          else:
-             # Fallback: use the default microphone so the code still works
-             # on systems where the original QBO mic name is not present.
              print("Warning: QBO microphone not found by name. Using default microphone.")
-             self.m = sr.Microphone(sample_rate=cfg_sample_rate)
+             with _suppress_c_stderr():
+                 self.m = sr.Microphone(sample_rate=cfg_sample_rate)
      except OSError as e:
          # No usable microphone found – log and leave self.m as None so callers can handle it.
          print("Error initializing microphone for QBOtalk:", e)
@@ -180,8 +200,9 @@ class QBOtalk(object):
 
      if self.m is not None:
          try:
-             with open_microphone_source(self.m) as source:
-                 self.r.adjust_for_ambient_noise(source)
+             with _suppress_c_stderr():
+                 with open_microphone_source(self.m) as source:
+                     self.r.adjust_for_ambient_noise(source)
          except Exception as e:
              print("Warning: microphone ambient calibration skipped:", e)
              self.m = None

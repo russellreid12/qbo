@@ -1,12 +1,43 @@
+import os
 import threading
 import time
+from contextlib import contextmanager
 from typing import Callable, Optional
 
 import numpy as np
 
+
+@contextmanager
+def _suppress_c_stderr():
+	if os.environ.get("QBO_VERBOSE_LIBS"):
+		yield
+		return
+	devnull = os.open(os.devnull, os.O_WRONLY)
+	saved = os.dup(2)
+	try:
+		os.dup2(devnull, 2)
+		os.close(devnull)
+		yield
+	finally:
+		os.dup2(saved, 2)
+		os.close(saved)
+
+
+if not os.environ.get("QBO_VERBOSE_LIBS"):
+	os.environ.setdefault("ORT_LOG_SEVERITY_LEVEL", "3")
+	try:
+		import onnxruntime as ort
+		ort.set_default_logger_severity(3)
+	except Exception:
+		pass
+
+HAVE_OPENWAKEWORD = False
+openwakeword = None
+Model = None
 try:
-	import openwakeword
-	from openwakeword.model import Model
+	with _suppress_c_stderr():
+		import openwakeword
+		from openwakeword.model import Model
 	HAVE_OPENWAKEWORD = True
 except ImportError:
 	openwakeword = None
@@ -44,7 +75,8 @@ class OpenWakeWordListener:
 			return
 
 		try:
-			self._model = Model()
+			with _suppress_c_stderr():
+				self._model = Model()
 		except Exception as e:
 			print("Error initializing openwakeword Model:", e)
 			return

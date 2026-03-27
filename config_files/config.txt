@@ -1,7 +1,6 @@
 dtparam=i2s=on
 dtparam=audio=off
-dtoverlay=i2s-mmap
-dtoverlay=max98357a
+dtoverlay=max98357a,sdmode-pin=25
 
 # Automatically load overlays for detected cameras
 camera_auto_detect=1

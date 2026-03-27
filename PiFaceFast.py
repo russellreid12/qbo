@@ -175,6 +175,38 @@ else:
 threaded_detector = 0
 
 
+# ---------------------------------------------------------------------------
+# PID Controller — replaces proportional-only tracking for accuracy
+# ---------------------------------------------------------------------------
+class PIDController:
+    """Simple PID with anti-windup for servo face tracking."""
+    def __init__(self, kp, ki, kd, integral_max=60.0):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.integral_max = integral_max
+        self._integral = 0.0
+        self._prev_error = 0.0
+
+    def reset(self):
+        self._integral = 0.0
+        self._prev_error = 0.0
+
+    def update(self, error, dt):
+        if dt <= 0:
+            dt = 0.033  # ~30 fps fallback
+        # Proportional
+        p = self.kp * error
+        # Integral with anti-windup clamp
+        self._integral += error * dt
+        self._integral = max(-self.integral_max, min(self.integral_max, self._integral))
+        i = self.ki * self._integral
+        # Derivative
+        d = self.kd * (error - self._prev_error) / dt
+        self._prev_error = error
+        return p + i + d
+
+
 Kpx = 1
 Kpy = 1
 Ksp = 40
@@ -263,9 +295,9 @@ def stop_voice_recording():
 #      chasing every single-frame bbox jitter that causes overshoot.
 # Alpha closer to 1.0 = more responsive but jitterier.
 # Alpha closer to 0.0 = smoother but slower to react.
-# 0.25 is a good starting point for a Pi camera at 320x240.
+# 0.4 balances responsiveness with PID-dampened stability.
 # ---------------------------------------------------------------------------
-_smooth_alpha = float(config.get("faceTrackingSmoothAlpha", 0.25))
+_smooth_alpha = float(config.get("faceTrackingSmoothAlpha", 0.4))
 _smoothed_cx = 160.0   # initialise to frame centre
 _smoothed_cy = 120.0
 
@@ -342,17 +374,94 @@ _face_invert_tilt = _cfg_bool(config.get("faceTrackingInvertTilt"), False)
 _camera_flip_h    = _cfg_bool(config.get("cameraFlipHorizontal"),   False)
 _face_debug       = _cfg_bool(config.get("faceTrackingDebug"),      False)
 _track_dbg_n      = 0
-_track_dead       = int(config.get("faceTrackingDeadband", 20))
-_pan_gain         = float(config.get("faceTrackingPanGain",  0.5))
-_tilt_gain        = float(config.get("faceTrackingTiltGain", 0.5))
+_track_dead       = int(config.get("faceTrackingDeadband", 12))
 _stabilize_sec    = float(config.get("faceTrackingStabilizeSec", 0.35))
 _face_stabilize_until = 0.0
 
+# PID gains (replace old proportional-only panGain/tiltGain)
+_pid_kp = float(config.get("faceTrackingKp", 0.35))
+_pid_ki = float(config.get("faceTrackingKi", 0.05))
+_pid_kd = float(config.get("faceTrackingKd", 0.15))
+_pid_integral_max = float(config.get("faceTrackingIntegralMax", 60.0))
+
+pid_pan  = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
+pid_tilt = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
+_last_track_time = time.time()
+
+# ---------------------------------------------------------------------------
+# DNN face detector (much more accurate than Haar cascades)
+# ---------------------------------------------------------------------------
+_face_detector_type = config.get("faceDetector", "dnn")  # "dnn" or "haar"
+_dnn_confidence_min = float(config.get("faceDetectorConfidence", 0.5))
+_dnn_net = None
+
+if _face_detector_type == "dnn":
+    _dnn_proto = "/opt/qbo/models/deploy.prototxt"
+    _dnn_model = "/opt/qbo/models/res10_300x300_ssd_iter_140000.caffemodel"
+    if os.path.isfile(_dnn_proto) and os.path.isfile(_dnn_model):
+        try:
+            _dnn_net = cv2.dnn.readNetFromCaffe(_dnn_proto, _dnn_model)
+            print("DNN face detector loaded successfully.")
+        except Exception as e:
+            print("DNN face detector failed to load: {} — falling back to Haar.".format(e))
+            _dnn_net = None
+    else:
+        print("DNN model files not found at /opt/qbo/models/ — falling back to Haar.")
+        print("Run: bash /opt/qbo/scripts/download_face_model.sh")
+
+
+def detect_faces_dnn(frame):
+    """Detect faces using OpenCV DNN SSD. Returns list of (x,y,w,h) tuples."""
+    h, w = frame.shape[:2]
+    blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300), (104.0, 177.0, 123.0))
+    _dnn_net.setInput(blob)
+    detections = _dnn_net.forward()
+    faces = []
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2]
+        if confidence < _dnn_confidence_min:
+            continue
+        box = detections[0, 0, i, 3:7] * [w, h, w, h]
+        x1, y1, x2, y2 = box.astype(int)
+        x1 = max(0, x1)
+        y1 = max(0, y1)
+        fw = x2 - x1
+        fh = y2 - y1
+        if fw > 20 and fh > 20:
+            faces.append((x1, y1, fw, fh))
+    return faces
+
+
+def detect_faces_frame(frame):
+    """Unified face detection — uses DNN if available, otherwise Haar cascades."""
+    if _dnn_net is not None:
+        return detect_faces_dnn(frame)
+    # Haar cascade fallback
+    fface = frontalface.detectMultiScale(
+        frame, 1.3, 4,
+        (cv2.CASCADE_DO_CANNY_PRUNING | cv2.CASCADE_FIND_BIGGEST_OBJECT |
+         cv2.CASCADE_DO_ROUGH_SEARCH),
+        (60, 60))
+    if len(fface) > 0:
+        return [tuple(f) for f in fface]
+    pfacer = profileface.detectMultiScale(
+        frame, 1.3, 4,
+        (cv2.CASCADE_DO_CANNY_PRUNING | cv2.CASCADE_FIND_BIGGEST_OBJECT |
+         cv2.CASCADE_DO_ROUGH_SEARCH),
+        (80, 80))
+    if len(pfacer) > 0:
+        return [tuple(f) for f in pfacer]
+    return []
+
 
 print("Camera resolution: {}x{}, detect center: ({},{})".format(frame_w, frame_h, frame_cx, frame_cy))
-print("faceTrackingInvertPan={} cameraFlipHorizontal={} deadband={} panGain={} tiltGain={} "
+print("faceDetector={} dnnLoaded={} confidence={}".format(
+     _face_detector_type, _dnn_net is not None, _dnn_confidence_min))
+print("PID: Kp={} Ki={} Kd={} integralMax={} deadband={}".format(
+     _pid_kp, _pid_ki, _pid_kd, _pid_integral_max, _track_dead))
+print("faceTrackingInvertPan={} cameraFlipHorizontal={} "
      "stabilizeSec={} smoothAlpha={} trackServoSpeed={} debug={}".format(
-     _face_invert_pan, _camera_flip_h, _track_dead, _pan_gain, _tilt_gain,
+     _face_invert_pan, _camera_flip_h,
      _stabilize_sec, _smooth_alpha, _track_servo_speed, _face_debug))
 print("serialTouchProbe={} (set false in config.yml to silence GET_TOUCH if UART is down)".format(
      _serial_touch_probe))
@@ -517,7 +626,7 @@ time.sleep(1)
 
 
 def ServoHome():
-   global Xcoor, Ycoor, touch_tm, _face_stabilize_until, _smoothed_cx, _smoothed_cy
+   global Xcoor, Ycoor, touch_tm, _face_stabilize_until, _smoothed_cx, _smoothed_cy, _last_track_time
 
 
    Xcoor = 511
@@ -532,6 +641,12 @@ def ServoHome():
    # Reset smoother so stale position doesn't yank the head on next detection
    _smoothed_cx = float(frame_cx)
    _smoothed_cy = float(frame_cy)
+
+
+   # Reset PID controllers so stale integral doesn't cause overshoot
+   pid_pan.reset()
+   pid_tilt.reset()
+   _last_track_time = time.time()
 
 
    print("Repositioning head: XCoor " + str(Xcoor) + ", YCoor " + str(Ycoor))
@@ -745,38 +860,16 @@ while True:
        HotwordListened = False
 
 
-   # --- Frontal face detection ---
+   # --- Face detection (DNN or Haar) ---
    if not faceFound and not _webcam_busy:
-       if lastface == 0 or lastface == 1:
-           aframe = read_webcam_detection_frame(webcam)
-           if aframe is not None:
-               fface = frontalface.detectMultiScale(
-                   aframe, 1.3, 4,
-                   (cv2.CASCADE_DO_CANNY_PRUNING | cv2.CASCADE_FIND_BIGGEST_OBJECT |
-                    cv2.CASCADE_DO_ROUGH_SEARCH),
-                   (60, 60))
-               if len(fface) > 0:
-                   face_not_found_idx = 0
-                   lastface = 1
-                   face = pick_largest_face_rect(fface)
-                   faceFound = True
-
-
-   # --- Profile face detection ---
-   if not faceFound and not _webcam_busy:
-       if lastface == 0 or lastface == 2:
-           aframe = read_webcam_detection_frame(webcam)
-           if aframe is not None:
-               pfacer = profileface.detectMultiScale(
-                   aframe, 1.3, 4,
-                   (cv2.CASCADE_DO_CANNY_PRUNING | cv2.CASCADE_FIND_BIGGEST_OBJECT |
-                    cv2.CASCADE_DO_ROUGH_SEARCH),
-                   (80, 80))
-               if len(pfacer) > 0:
-                   face_not_found_idx = 0
-                   lastface = 2
-                   face = pick_largest_face_rect(pfacer)
-                   faceFound = True
+       aframe = read_webcam_detection_frame(webcam)
+       if aframe is not None:
+           detected = detect_faces_frame(aframe)
+           if len(detected) > 0:
+               face_not_found_idx = 0
+               lastface = 1
+               face = pick_largest_face_rect(detected)
+               faceFound = True
 
 
    # --- No face found ---
@@ -797,6 +890,8 @@ while True:
                stop_voice_recording()
                track_state = TRACK_SEARCHING
                track_centered_since = 0.0
+               pid_pan.reset()
+               pid_tilt.reset()
 
 
            if config["distro"] != "ibmwatson":
@@ -920,26 +1015,35 @@ while True:
                    Listening = True
 
 
-       # --- Pan / tilt servo tracking ---
+       # --- Pan / tilt servo tracking (PID) ---
        if touch_det == False and time.time() >= _face_stabilize_until:
+           now = time.time()
+           dt = now - _last_track_time
+           _last_track_time = now
 
 
            if abs(faceOffset_X) > _track_dead:
-               Xcoor = max(Xmin, min(Xmax, Xcoor + int(faceOffset_X * _pan_gain)))
+               pan_out = pid_pan.update(faceOffset_X, dt)
+               Xcoor = max(Xmin, min(Xmax, Xcoor + int(pan_out)))
                controller.SetServo(1, Xcoor, _track_servo_speed)
                if _face_debug:
                    _track_dbg_n += 1
                    if _track_dbg_n % 25 == 0:
-                       print("faceTrack dbg: raw_x={:.1f} smooth_x={:.1f} offX={:.1f} "
-                             "Xcoor={} (invertPan={})".format(
-                             raw_cx, _smoothed_cx, faceOffset_X, Xcoor, _face_invert_pan))
-               time.sleep(0.05)
+                       print("PID pan: err={:.1f} out={:.1f} Xcoor={} dt={:.3f}".format(
+                             faceOffset_X, pan_out, Xcoor, dt))
+           else:
+               pid_pan._prev_error = 0.0  # reset derivative when centered
 
 
            if abs(faceOffset_Y) > _track_dead:
-               Ycoor = max(Ymin, min(Ymax, Ycoor + int(faceOffset_Y * _tilt_gain)))
+               tilt_out = pid_tilt.update(faceOffset_Y, dt)
+               Ycoor = max(Ymin, min(Ymax, Ycoor + int(tilt_out)))
                controller.SetServo(2, Ycoor, _track_servo_speed)
-               time.sleep(0.05)
+               if _face_debug and _track_dbg_n % 25 == 0:
+                   print("PID tilt: err={:.1f} out={:.1f} Ycoor={} dt={:.3f}".format(
+                         faceOffset_Y, tilt_out, Ycoor, dt))
+           else:
+               pid_tilt._prev_error = 0.0  # reset derivative when centered
 
 
    # --- Touch sensor ---

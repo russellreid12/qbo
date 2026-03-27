@@ -395,7 +395,7 @@ _camera_flip_h    = _cfg_bool(config.get("cameraFlipHorizontal"),   False)
 _face_debug       = _cfg_bool(config.get("faceTrackingDebug"),      False)
 _face_debug_interval = int(config.get("faceTrackingDebugInterval", 10))  # print every N frames
 _track_dbg_n      = 0
-_track_dead       = int(config.get("faceTrackingDeadband", 12))
+_track_dead       = int(config.get("faceTrackingDeadband", 8))
 _stabilize_sec    = float(config.get("faceTrackingStabilizeSec", 0.35))
 _face_stabilize_until = 0.0
 

@@ -389,7 +389,7 @@ frame_cx = 160
 frame_cy = 120
 
 
-_face_invert_pan  = _cfg_bool(config.get("faceTrackingInvertPan"),  False)
+_face_invert_pan  = True  # FORCED TRUE: proven by coordinate analysis
 _face_invert_tilt = _cfg_bool(config.get("faceTrackingInvertTilt"), False)
 _camera_flip_h    = _cfg_bool(config.get("cameraFlipHorizontal"),   False)
 _face_debug       = _cfg_bool(config.get("faceTrackingDebug"),      False)
@@ -420,8 +420,8 @@ _pid_kd = float(config.get("faceTrackingKd", 0.08))
 _pid_integral_max = float(config.get("faceTrackingIntegralMax", 30.0))
 
 # Max servo units the PID can move per frame — hard cap prevents overshoot
-# regardless of PID tuning.  At ~5 FPS, 15 units/frame ≈ 75 units/sec.
-_track_max_step = int(config.get("faceTrackingMaxStep", 15))
+# regardless of PID tuning.  At ~5 FPS, 40 units/frame ≈ 200 units/sec.
+_track_max_step = int(config.get("faceTrackingMaxStep", 40))
 
 pid_pan  = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
 pid_tilt = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
@@ -976,7 +976,7 @@ while True:
                print("No face, 5 times!")
 
 
-           elif time.time() - no_face_tm > 10:
+           elif time.time() - no_face_tm > 3:
                ServoHome()
                Cface[0] = [0, 0]
                no_face_tm = time.time()

@@ -421,8 +421,8 @@ _pid_kd = float(config.get("faceTrackingKd", 0.08))
 _pid_integral_max = float(config.get("faceTrackingIntegralMax", 30.0))
 
 # Max servo units the PID can move per frame — hard cap prevents overshoot
-# regardless of PID tuning.  At ~5 FPS, 4 units/frame ≈ 20 units/sec.
-_track_max_step = int(config.get("faceTrackingMaxStep", 4))
+# regardless of PID tuning.  At ~5 FPS, 15 units/frame ≈ 75 units/sec.
+_track_max_step = int(config.get("faceTrackingMaxStep", 15))
 
 pid_pan  = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
 pid_tilt = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)

@@ -193,15 +193,15 @@ class PIDController:
         self._prev_error = 0.0
 
     def update(self, error, dt):
-        if dt <= 0:
-            dt = 0.033  # ~30 fps fallback
+        # Clamp dt to prevent derivative spikes from near-zero or very stale values
+        dt = max(0.016, min(0.5, dt))
         # Proportional
         p = self.kp * error
         # Integral with anti-windup clamp
         self._integral += error * dt
         self._integral = max(-self.integral_max, min(self.integral_max, self._integral))
         i = self.ki * self._integral
-        # Derivative
+        # Derivative (rate of error change)
         d = self.kd * (error - self._prev_error) / dt
         self._prev_error = error
         return p + i + d
@@ -892,6 +892,7 @@ while True:
                track_centered_since = 0.0
                pid_pan.reset()
                pid_tilt.reset()
+               _last_track_time = time.time()
 
 
            if config["distro"] != "ibmwatson":
@@ -950,6 +951,9 @@ while True:
            _face_stabilize_until = time.time() + _stabilize_sec
            track_state = TRACK_DETECTING
            track_centered_since = 0.0
+           _last_track_time = time.time()
+           pid_pan.reset()
+           pid_tilt.reset()
            print("Face found -> DETECTING (green)")
 
 
@@ -1081,6 +1085,10 @@ while True:
    if touch_tm != 0 and time.time() - touch_tm > touch_wait:
        print("touch ready")
        touch_tm = 0
+
+
+   # Throttle main loop to ~30 Hz max
+   time.sleep(0.033)
 
 
 

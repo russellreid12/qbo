@@ -292,6 +292,11 @@ except Exception:
 controller = Controller(ser)
 vc = VisualRecognition()
 
+try:
+   controller.SetEnableSpeaker(True)
+except Exception as e:
+   print("SetEnableSpeaker: %s" % e)
+
 
 try:
    controller.SetMicrophoneGain(config['microphoneGain'])

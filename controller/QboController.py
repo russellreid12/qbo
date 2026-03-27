@@ -457,6 +457,12 @@ class Controller(object):
       return self.SendCmdQBO(Command(self.SET_ADC_REF, 1, value))
 
 
+  def SetEnableSpeaker(self, enable):
+      """Tell head MCU to enable (1) or disable (0) the speaker path; QBO may be silent without this."""
+      b = 1 if enable else 0
+      return self.GetHeadCmd("SET_ENABLE_SPEAKER", [b])
+
+
 
 
 

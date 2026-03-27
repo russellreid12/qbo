@@ -187,10 +187,19 @@ class PIDController:
         self.integral_max = integral_max
         self._integral = 0.0
         self._prev_error = 0.0
+        # Diagnostic: last computed P, I, D terms (readable for debug output)
+        self.last_p = 0.0
+        self.last_i = 0.0
+        self.last_d = 0.0
+        self.last_output = 0.0
 
     def reset(self):
         self._integral = 0.0
         self._prev_error = 0.0
+        self.last_p = 0.0
+        self.last_i = 0.0
+        self.last_d = 0.0
+        self.last_output = 0.0
 
     def update(self, error, dt):
         # Clamp dt to prevent derivative spikes from near-zero or very stale values
@@ -204,6 +213,11 @@ class PIDController:
         # Derivative (rate of error change)
         d = self.kd * (error - self._prev_error) / dt
         self._prev_error = error
+        # Store for debug inspection
+        self.last_p = p
+        self.last_i = i
+        self.last_d = d
+        self.last_output = p + i + d
         return p + i + d
 
 
@@ -373,10 +387,25 @@ _face_invert_pan  = _cfg_bool(config.get("faceTrackingInvertPan"),  False)
 _face_invert_tilt = _cfg_bool(config.get("faceTrackingInvertTilt"), False)
 _camera_flip_h    = _cfg_bool(config.get("cameraFlipHorizontal"),   False)
 _face_debug       = _cfg_bool(config.get("faceTrackingDebug"),      False)
+_face_debug_interval = int(config.get("faceTrackingDebugInterval", 10))  # print every N frames
 _track_dbg_n      = 0
 _track_dead       = int(config.get("faceTrackingDeadband", 12))
 _stabilize_sec    = float(config.get("faceTrackingStabilizeSec", 0.35))
 _face_stabilize_until = 0.0
+
+# ---------------------------------------------------------------------------
+# Debug / telemetry counters
+# ---------------------------------------------------------------------------
+_dbg_fps_t0        = time.time()     # FPS window start
+_dbg_fps_frames    = 0               # frames in current window
+_dbg_fps_value     = 0.0             # computed FPS
+_dbg_detect_count  = 0               # total successful detections
+_dbg_miss_count    = 0               # total missed frames (no face)
+_dbg_last_conf     = 0.0             # last DNN confidence (0 for Haar)
+_dbg_last_det_ms   = 0.0             # last detection time in ms
+_dbg_last_face_w   = 0               # last face bbox width
+_dbg_last_face_h   = 0               # last face bbox height
+_dbg_state_names   = {TRACK_SEARCHING: "SEARCHING", TRACK_DETECTING: "DETECTING", TRACK_LOCKED: "LOCKED"}
 
 # PID gains (replace old proportional-only panGain/tiltGain)
 _pid_kp = float(config.get("faceTrackingKp", 0.35))
@@ -411,12 +440,15 @@ if _face_detector_type == "dnn":
 
 
 def detect_faces_dnn(frame):
-    """Detect faces using OpenCV DNN SSD. Returns list of (x,y,w,h) tuples."""
+    """Detect faces using OpenCV DNN SSD. Returns list of (x,y,w,h) tuples.
+    Also stores best confidence in _dbg_last_conf for debug output."""
+    global _dbg_last_conf
     h, w = frame.shape[:2]
     blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300), (104.0, 177.0, 123.0))
     _dnn_net.setInput(blob)
     detections = _dnn_net.forward()
     faces = []
+    best_conf = 0.0
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
         if confidence < _dnn_confidence_min:
@@ -429,6 +461,9 @@ def detect_faces_dnn(frame):
         fh = y2 - y1
         if fw > 20 and fh > 20:
             faces.append((x1, y1, fw, fh))
+            if confidence > best_conf:
+                best_conf = float(confidence)
+    _dbg_last_conf = best_conf
     return faces
 
 
@@ -460,9 +495,9 @@ print("faceDetector={} dnnLoaded={} confidence={}".format(
 print("PID: Kp={} Ki={} Kd={} integralMax={} deadband={}".format(
      _pid_kp, _pid_ki, _pid_kd, _pid_integral_max, _track_dead))
 print("faceTrackingInvertPan={} cameraFlipHorizontal={} "
-     "stabilizeSec={} smoothAlpha={} trackServoSpeed={} debug={}".format(
+     "stabilizeSec={} smoothAlpha={} trackServoSpeed={} debug={} debugInterval={}".format(
      _face_invert_pan, _camera_flip_h,
-     _stabilize_sec, _smooth_alpha, _track_servo_speed, _face_debug))
+     _stabilize_sec, _smooth_alpha, _track_servo_speed, _face_debug, _face_debug_interval))
 print("serialTouchProbe={} (set false in config.yml to silence GET_TOUCH if UART is down)".format(
      _serial_touch_probe))
 
@@ -824,6 +859,7 @@ Speak.SpeechText_2("I am ready.", "Estoy preparado.")
 
 touch_tm = time.time()
 fr_time = 0
+_dbg_loop_iter = 0   # main-loop iteration counter for debug summary
 
 
 
@@ -835,6 +871,19 @@ fr_time = 0
 
 while True:
    fr_time = time.time()
+
+   # ---- Debug: FPS and loop counter ----
+   _dbg_loop_iter += 1
+   _dbg_fps_frames += 1
+   _fps_elapsed = fr_time - _dbg_fps_t0
+   if _fps_elapsed >= 2.0:
+       _dbg_fps_value = _dbg_fps_frames / _fps_elapsed
+       _dbg_fps_frames = 0
+       _dbg_fps_t0 = fr_time
+       if _face_debug:
+           print("FPS: {:.1f} | loop#{} | detections={} misses={} | state={}".format(
+               _dbg_fps_value, _dbg_loop_iter, _dbg_detect_count, _dbg_miss_count,
+               _dbg_state_names.get(track_state, "??")))
 
 
    faceFound = False
@@ -862,20 +911,31 @@ while True:
 
    # --- Face detection (DNN or Haar) ---
    if not faceFound and not _webcam_busy:
+       _det_t0 = time.time()
        aframe = read_webcam_detection_frame(webcam)
        if aframe is not None:
            detected = detect_faces_frame(aframe)
+           _dbg_last_det_ms = (time.time() - _det_t0) * 1000.0
            if len(detected) > 0:
                face_not_found_idx = 0
                lastface = 1
                face = pick_largest_face_rect(detected)
                faceFound = True
+               _dbg_detect_count += 1
+               _dbg_last_face_w = int(face[2])
+               _dbg_last_face_h = int(face[3])
+               if _face_debug and _track_dbg_n % _face_debug_interval == 0:
+                   print("DET: {} faces | best={}x{} at ({},{}) | conf={:.2f} | {:.1f}ms | method={}".format(
+                       len(detected), _dbg_last_face_w, _dbg_last_face_h,
+                       int(face[0]), int(face[1]), _dbg_last_conf, _dbg_last_det_ms,
+                       "DNN" if _dnn_net is not None else "Haar"))
 
 
    # --- No face found ---
    # Don't count missed frames while webcam is busy with background recognition
    if not faceFound and not _webcam_busy:
        face_not_found_idx += 1
+       _dbg_miss_count += 1
 
 
        if face_not_found_idx > 20:
@@ -1028,26 +1088,38 @@ while True:
 
            if abs(faceOffset_X) > _track_dead:
                pan_out = pid_pan.update(faceOffset_X, dt)
-               Xcoor = max(Xmin, min(Xmax, Xcoor - int(pan_out)))
+               Xcoor = max(Xmin, min(Xmax, Xcoor + int(pan_out)))
                controller.SetServo(1, Xcoor, _track_servo_speed)
-               if _face_debug:
-                   _track_dbg_n += 1
-                   if _track_dbg_n % 25 == 0:
-                       print("PID pan: err={:.1f} out={:.1f} Xcoor={} dt={:.3f}".format(
-                             faceOffset_X, pan_out, Xcoor, dt))
            else:
-               pid_pan._prev_error = 0.0  # reset derivative when centered
+               pid_pan._prev_error = 0.0
 
 
            if abs(faceOffset_Y) > _track_dead:
                tilt_out = pid_tilt.update(faceOffset_Y, dt)
                Ycoor = max(Ymin, min(Ymax, Ycoor + int(tilt_out)))
                controller.SetServo(2, Ycoor, _track_servo_speed)
-               if _face_debug and _track_dbg_n % 25 == 0:
-                   print("PID tilt: err={:.1f} out={:.1f} Ycoor={} dt={:.3f}".format(
-                         faceOffset_Y, tilt_out, Ycoor, dt))
            else:
-               pid_tilt._prev_error = 0.0  # reset derivative when centered
+               pid_tilt._prev_error = 0.0
+           if _face_debug:
+                _track_dbg_n += 1
+                if _track_dbg_n % _face_debug_interval == 0:
+                    # Smoothing delta (how much EMA is shifting the raw reading)
+                    _sm_dx = _smoothed_cx - raw_cx
+                    _sm_dy = _smoothed_cy - raw_cy
+                    print("TRACK #{}: raw=({:.0f},{:.0f}) smooth=({:.0f},{:.0f}) Δsmooth=({:.1f},{:.1f}) "
+                          "offset=({:.1f},{:.1f}) centered={} state={}".format(
+                          _track_dbg_n, raw_cx, raw_cy, _smoothed_cx, _smoothed_cy,
+                          _sm_dx, _sm_dy, faceOffset_X, faceOffset_Y,
+                          face_is_centered, _dbg_state_names.get(track_state, "??")))
+                    print("  PAN  pid: P={:.2f} I={:.2f} D={:.2f} out={:.2f} | integral={:.2f} | servo X={}".format(
+                          pid_pan.last_p, pid_pan.last_i, pid_pan.last_d, pid_pan.last_output,
+                          pid_pan._integral, Xcoor))
+                    print("  TILT pid: P={:.2f} I={:.2f} D={:.2f} out={:.2f} | integral={:.2f} | servo Y={}".format(
+                          pid_tilt.last_p, pid_tilt.last_i, pid_tilt.last_d, pid_tilt.last_output,
+                          pid_tilt._integral, Ycoor))
+                    print("  face={}x{} conf={:.2f} det={:.1f}ms dt={:.3f}s deadband={} FPS={:.1f}".format(
+                          _dbg_last_face_w, _dbg_last_face_h, _dbg_last_conf,
+                          _dbg_last_det_ms, dt, _track_dead, _dbg_fps_value))
 
 
    # --- Touch sensor ---

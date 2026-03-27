@@ -420,6 +420,10 @@ _pid_ki = float(config.get("faceTrackingKi", 0.02))
 _pid_kd = float(config.get("faceTrackingKd", 0.08))
 _pid_integral_max = float(config.get("faceTrackingIntegralMax", 30.0))
 
+# Max servo units the PID can move per frame — hard cap prevents overshoot
+# regardless of PID tuning.  At ~5 FPS, 4 units/frame ≈ 20 units/sec.
+_track_max_step = int(config.get("faceTrackingMaxStep", 4))
+
 pid_pan  = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
 pid_tilt = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
 _last_track_time = time.time()
@@ -499,8 +503,8 @@ def detect_faces_frame(frame):
 print("Camera resolution: {}x{}, detect center: ({},{})".format(frame_w, frame_h, frame_cx, frame_cy))
 print("faceDetector={} dnnLoaded={} confidence={}".format(
      _face_detector_type, _dnn_net is not None, _dnn_confidence_min))
-print("PID: Kp={} Ki={} Kd={} integralMax={} deadband={}".format(
-     _pid_kp, _pid_ki, _pid_kd, _pid_integral_max, _track_dead))
+print("PID: Kp={} Ki={} Kd={} integralMax={} deadband={} maxStep={}".format(
+     _pid_kp, _pid_ki, _pid_kd, _pid_integral_max, _track_dead, _track_max_step))
 print("faceTrackingInvertPan={} cameraFlipHorizontal={} "
      "stabilizeSec={} smoothAlpha={} trackServoSpeed={} debug={} debugInterval={}".format(
      _face_invert_pan, _camera_flip_h,
@@ -878,6 +882,7 @@ _dbg_loop_iter = 0   # main-loop iteration counter for debug summary
 
 while True:
    fr_time = time.time()
+   _last_track_time = fr_time  # keep fresh every loop to prevent stale dt spikes
 
    # ---- Debug: FPS and loop counter ----
    _dbg_loop_iter += 1
@@ -1095,7 +1100,8 @@ while True:
 
            if abs(faceOffset_X) > _track_dead:
                pan_out = pid_pan.update(faceOffset_X, dt)
-               Xcoor = max(Xmin, min(Xmax, Xcoor + int(pan_out)))
+               pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
+               Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
                controller.SetServo(1, Xcoor, _track_servo_speed)
            else:
                pid_pan.decay_integral()  # bleed off stale integral in deadband
@@ -1103,7 +1109,8 @@ while True:
 
            if abs(faceOffset_Y) > _track_dead:
                tilt_out = pid_tilt.update(faceOffset_Y, dt)
-               Ycoor = max(Ymin, min(Ymax, Ycoor + int(tilt_out)))
+               tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
+               Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
                controller.SetServo(2, Ycoor, _track_servo_speed)
            else:
                pid_tilt.decay_integral()  # bleed off stale integral in deadband

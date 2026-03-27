@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: latin-1 -*-
 
+# Before onnxruntime (hotword): reduce GPU discovery warning on Pi.
+import os
+if not os.environ.get("QBO_VERBOSE_LIBS"):
+    os.environ.setdefault("ORT_LOG_SEVERITY_LEVEL", "3")
 
 import datetime
-import os
 import subprocess
 import cv2
 import serial

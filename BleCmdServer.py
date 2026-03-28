@@ -9,7 +9,12 @@ from typing import Optional
 
 from bless import BlessServer
 from bless.backends.characteristic import GATTCharacteristicProperties
-from bless.backends.service import GATTAttributePermissions
+
+# kevincar/bless: older builds expose this on backends.service; newer versions re-export from bless.
+try:
+    from bless.backends.service import GATTAttributePermissions
+except ImportError:
+    from bless import GATTAttributePermissions
 
 FIFO_CMD = "/opt/qbo/pipes/pipe_cmd"
 SERVICE_UUID = "7f4b0001-0c56-4a58-9b20-52d2b4f35a01"

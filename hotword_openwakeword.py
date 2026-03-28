@@ -24,12 +24,40 @@ def _suppress_c_stderr():
 
 
 if not os.environ.get("QBO_VERBOSE_LIBS"):
-	os.environ.setdefault("ORT_LOG_SEVERITY_LEVEL", "3")
+	os.environ.setdefault("ORT_LOG_SEVERITY_LEVEL", "4")
 	try:
 		import onnxruntime as ort
-		ort.set_default_logger_severity(3)
+		ort.set_default_logger_severity(4)
 	except Exception:
 		pass
+
+def _download_openwakeword_resources_fallback():
+	"""Download FEATURE_MODELS + one wakeword when utils.download_models is absent (newer openWakeWord)."""
+	import urllib.request
+
+	fm = getattr(openwakeword, "FEATURE_MODELS", None)
+	if not fm:
+		return
+	for _name, info in fm.items():
+		path = info["model_path"]
+		url = info.get("download_url")
+		if not url:
+			continue
+		os.makedirs(os.path.dirname(path), exist_ok=True)
+		if os.path.isfile(path) and os.path.getsize(path) > 1000:
+			continue
+		urllib.request.urlretrieve(url, path)
+	models = getattr(openwakeword, "MODELS", {})
+	for _key, info in models.items():
+		path = info["model_path"]
+		url = info.get("download_url")
+		if not url:
+			continue
+		os.makedirs(os.path.dirname(path), exist_ok=True)
+		if os.path.isfile(path) and os.path.getsize(path) > 1000:
+			continue
+		urllib.request.urlretrieve(url, path)
+
 
 HAVE_OPENWAKEWORD = False
 openwakeword = None
@@ -67,12 +95,15 @@ class OpenWakeWordListener:
 		if self._thread is not None:
 			return
 
-		# Ensure models are available (downloads pre-trained ones if needed)
+		# Older PyPI: openwakeword.utils.download_models(). Newer git/main: removed — pull URLs from package.
 		try:
-			openwakeword.utils.download_models()
+			utils = getattr(openwakeword, "utils", None)
+			if utils is not None and hasattr(utils, "download_models"):
+				utils.download_models()
+			else:
+				_download_openwakeword_resources_fallback()
 		except Exception as e:
-			print("Error downloading openwakeword models:", e)
-			return
+			print("Warning: openwakeword model fetch:", e)
 
 		try:
 			with _suppress_c_stderr():
@@ -103,14 +134,15 @@ class OpenWakeWordListener:
 				print("Error in hotword callback:", e)
 
 		try:
-			with sd.InputStream(
-				channels=1,
-				samplerate=self.sample_rate,
-				blocksize=self.block_size,
-				callback=audio_callback,
-			):
-				while not self._stop.is_set():
-					time.sleep(0.1)
+			with _suppress_c_stderr():
+				with sd.InputStream(
+					channels=1,
+					samplerate=self.sample_rate,
+					blocksize=self.block_size,
+					callback=audio_callback,
+				):
+					while not self._stop.is_set():
+						time.sleep(0.1)
 		except Exception as e:
 			print("Error starting audio input stream for openwakeword:", e)
 

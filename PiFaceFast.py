@@ -4,7 +4,8 @@
 # Before onnxruntime (hotword): reduce GPU discovery warning on Pi.
 import os
 if not os.environ.get("QBO_VERBOSE_LIBS"):
-    os.environ.setdefault("ORT_LOG_SEVERITY_LEVEL", "3")
+    # 3=ERROR still shows some ORT warnings; 4=FATAL suppresses GPU discovery noise on Pi.
+    os.environ.setdefault("ORT_LOG_SEVERITY_LEVEL", "4")
 
 import datetime
 import subprocess

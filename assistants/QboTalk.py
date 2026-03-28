@@ -633,8 +633,9 @@ class QBOtalk(object):
          return
 
 
-     with open_microphone_source(self.m) as source:
-         audio = self.r.listen(source=source, timeout=2)
+     with _suppress_c_stderr():
+         with open_microphone_source(self.m) as source:
+             audio = self.r.listen(source=source, timeout=2)
 
 
      response = self.Decode(audio)
@@ -652,14 +653,16 @@ class QBOtalk(object):
 
 
 
-     with open_microphone_source(self.m) as source:
-         self.r.adjust_for_ambient_noise(source)
+     with _suppress_c_stderr():
+         with open_microphone_source(self.m) as source:
+             self.r.adjust_for_ambient_noise(source)
 
 
      print("start background listening")
 
 
-     return self.r.listen_in_background(self.m, self.callback)
+     with _suppress_c_stderr():
+         return self.r.listen_in_background(self.m, self.callback)
 
 
 
@@ -674,15 +677,17 @@ class QBOtalk(object):
 
 
 
-     with open_microphone_source(self.m) as source:
-         self.r.adjust_for_ambient_noise(source)
+     with _suppress_c_stderr():
+         with open_microphone_source(self.m) as source:
+             self.r.adjust_for_ambient_noise(source)
 
 
      print("start background only listening")
 
 
 
-     return self.r.listen_in_background(self.m, self.callback_listen)
+     with _suppress_c_stderr():
+         return self.r.listen_in_background(self.m, self.callback_listen)
 
 
 

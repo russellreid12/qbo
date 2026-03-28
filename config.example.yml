@@ -1,0 +1,72 @@
+# =============================================================================
+# QBO config example — copy to /opt/qbo/config.yml and edit.
+# =============================================================================
+#
+# AUDIO: two profiles below (robot vs AirPods). Only one profile may be active:
+#   • Comment out the ACTIVE block for the profile you are NOT using.
+#   • Uncomment the INACTIVE block for the profile you want.
+#   • Do not leave duplicate keys (YAML keeps the last one — avoid confusion).
+#
+# AirPods: use Bluetooth HFP (mic + headphones). Set PipeWire defaults so
+#   "pulse" hits the buds (wpctl set-default <sink id> and <source id>).
+#   python3 -c "import speech_recognition as sr; print(*enumerate(sr.Microphone.list_microphone_names()), sep='\n')" 2>/dev/null
+#   → use index for "pulse" (often 5) if you use the AirPods mic profile.
+# =============================================================================
+
+distro: standalone
+language: english
+startWith: interactive-dialogflow
+volume: 100
+microphoneGain: 100
+camera: 0
+headYPosition: 39
+servoSpeed: 100
+SpeechToTextListeningTime: 5
+serialPort: /dev/serial0
+
+tokenAPIai: ''
+gassistant_proyectid: ''
+dialogflowv2_projectid: ''
+
+# -----------------------------------------------------------------------------
+# AUDIO PROFILES — toggle robot vs AirPods (see instructions at top)
+# -----------------------------------------------------------------------------
+
+# ----- PROFILE: ROBOT (onboard MAX98357 / Voice HAT) -----
+audioPlaybackMode: plughw
+# If you use /etc/asound.conf convertQBO instead, comment plughw and use:
+# audioPlaybackMode: convertQBO
+# Or set an explicit PCM only (then audioPlaybackMode is ignored):
+# audioPlaybackDevice: plughw:0,0
+
+# Mic: index of "dmicQBO_sv" from PortAudio list (often 11; verify on your Pi).
+microphoneDeviceIndex: 11
+microphoneAlsaDevice: dmicQBO_sv
+microphoneSampleRate: 16000
+microphoneAlsaSampleRate: 16000
+
+# ----- PROFILE: AIRPODS (PipeWire pulse; comment all ROBOT keys above first) -----
+# When switching to AirPods, comment out these five keys from ROBOT:
+#   audioPlaybackMode, microphoneDeviceIndex, microphoneAlsaDevice,
+#   microphoneSampleRate, microphoneAlsaSampleRate
+# Then uncomment the five lines below:
+#
+#audioPlaybackDevice: pulse
+#microphoneDeviceIndex: 5
+#microphoneAlsaDevice: pulse
+#microphoneSampleRate: 16000
+#microphoneAlsaSampleRate: 16000
+# If capture fails on HFP CVSD, try 8000 for both sample rates instead of 16000.
+
+# -----------------------------------------------------------------------------
+# IBM Watson / other API keys (if distro: ibmwatson)
+# -----------------------------------------------------------------------------
+AssistantAPIKey: ''
+AssistantURL: ''
+AssistantID: ''
+TextToSpeechAPIKey: ''
+TextToSpeechURL: ''
+SpeechToTextAPIKey: ''
+SpeechToTextURL: ''
+VisualRecognitionAPIKey: ''
+VisualRecognitionURL: ''

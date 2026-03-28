@@ -281,15 +281,20 @@ recording_process = None
 
 
 def start_voice_recording():
-   """Start recording voice through the QBO microphone via arecord."""
+   """Start recording via arecord. Use microphoneAlsaDevice in config.yml (e.g. pulse for AirPods HFP)."""
    global recording_process
    if recording_process is not None:
        return  # already recording
+   dev = str(config.get("microphoneAlsaDevice") or "dmicQBO_sv").strip() or "dmicQBO_sv"
+   try:
+       rate = int(config.get("microphoneAlsaSampleRate", config.get("microphoneSampleRate", 16000)))
+   except (TypeError, ValueError):
+       rate = 16000
    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
    os.makedirs("/opt/qbo/recordings", exist_ok=True)
    filepath = "/opt/qbo/recordings/voice_{}.wav".format(timestamp)
    recording_process = subprocess.Popen(
-       ["arecord", "-D", "dmicQBO_sv", "-f", "S16_LE", "-r", "16000", "-c", "1", filepath],
+       ["arecord", "-D", dev, "-f", "S16_LE", "-r", str(rate), "-c", "1", filepath],
        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
    )
    print("Recording started: " + filepath)

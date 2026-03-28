@@ -155,7 +155,15 @@ class QBOtalk(object):
 
      # Try to find the QBO microphone by name. Accept any of the known
      # device names used across different QBO hardware revisions.
-     QBO_MIC_NAMES = ("dmicQBO_sv", "googlevoicehat", "voicehat")
+     QBO_MIC_NAMES = (
+         "dmicQBO_sv",
+         "googlevoicehat",
+         "voicehat",
+         "bluez",
+         "airpods",
+         "hands-free",
+         "handsfree",
+     )
      mic_index = None
      with _suppress_c_stderr():
          mic_names = sr.Microphone.list_microphone_names()

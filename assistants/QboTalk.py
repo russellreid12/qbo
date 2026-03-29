@@ -24,7 +24,7 @@ import wave
 import yaml
 from contextlib import contextmanager
 
-from qbo_audio import aplay_wav_device_quoted
+from qbo_audio import aplay_wav_shell_play_wav
 
 
 
@@ -539,8 +539,8 @@ class QBOtalk(object):
              "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
          ).format(gen=gen, wav=wav, hw=hw, g0=g0)
      else:
-         cmd = "{gen} && aplay -D {dev} {wav}".format(
-             gen=gen, dev=aplay_wav_device_quoted(self.config), wav=wav
+         cmd = "{gen} && {aplay}".format(
+             gen=gen, aplay=aplay_wav_shell_play_wav(self.config, wav)
          )
 
 

@@ -4,13 +4,14 @@ import time
 import yaml
 import subprocess
 
-from qbo_audio import aplay_wav_device_quoted
+from qbo_audio import aplay_wav_shell_play_wav
 
 time.sleep(5)
 
 # read config file
 config = yaml.safe_load(open("/opt/qbo/config.yml"))
-_aplay_d = aplay_wav_device_quoted(config)
+_PICO_WAV = "/opt/qbo/sounds/pico2wave.wav"
+_aplay_play = aplay_wav_shell_play_wav(config, _PICO_WAV)
 
 
 def _enable_qbo_speaker_before_tts(cfg):
@@ -40,10 +41,10 @@ _enable_qbo_speaker_before_tts(config)
 
 if config["language"] == "spanish":
 	text = "Hola. Soy Cubo."
-	speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
+	speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && " + _aplay_play
 else:
 	text = "Hello. I'm Q-B-O."
-	speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
+	speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && " + _aplay_play
 
 subprocess.call(speak, shell=True)
 time.sleep(0.5)
@@ -52,10 +53,10 @@ if config["startWith"] == "scratch":
 
 	if config["language"] == "spanish":
 		text = "Estoy en modo Scratch."
-		speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
+		speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && " + _aplay_play
 	else:
 		text = "I'm in Scratch mode."
-		speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
+		speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && " + _aplay_play
 
 	subprocess.call(speak, shell=True)
 
@@ -65,10 +66,10 @@ elif config["startWith"] == "develop":
 
 	if config["language"] == "spanish":
 		text = "Estoy en modo desarrollo. Conectate por SSH o VNC para interacturar con Cubo."
-		speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
+		speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && " + _aplay_play
 	else:
 		text = "I'm in development mode. Connect by SSH or VNC to interact with CUBO."
-		speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
+		speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && " + _aplay_play
 
 	subprocess.call(speak, shell=True)
 
@@ -76,10 +77,10 @@ else:
 
 	if (config["language"] == "spanish"):
 		text = "Estoy en modo interactivo. Por favor, espere unos segundos."
-		speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
+		speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && " + _aplay_play
 	else:
 		text = "I'm in interactive mode. Please, wait a few seconds."
-		speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"
+		speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && " + _aplay_play
 
 	subprocess.call(speak, shell=True)
 

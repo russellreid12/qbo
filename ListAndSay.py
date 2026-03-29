@@ -7,7 +7,7 @@ import os
 import time
 import yaml
 
-from qbo_audio import aplay_wav_device_quoted
+from qbo_audio import aplay_stdin_shell_play_chain
 
 # FIFO init.
 FIFO_listen = '/opt/qbo/pipes/pipe_listen'
@@ -37,11 +37,11 @@ def SayFromFifo():
 
 		print('Read: "{0}"'.format(data))
 
-		d = aplay_wav_device_quoted(config)
+		_aplay = aplay_stdin_shell_play_chain(config)
 		if config["languaje"] == "english":
-			speak = "espeak -ven+f3 \"" + data + "\" --stdout  | aplay -D " + d
+			speak = "espeak -ven+f3 \"" + data + "\" --stdout  | " + _aplay
 		elif config["languaje"] == "spanish":
-			speak = "espeak -v mb-es2 -s 120 \"" + data + "\" --stdout  | aplay -D " + d
+			speak = "espeak -v mb-es2 -s 120 \"" + data + "\" --stdout  | " + _aplay
 
 		subprocess.call(speak, shell=True)
 

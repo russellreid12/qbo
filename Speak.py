@@ -9,7 +9,7 @@ import re
 import yaml
 import subprocess
 
-from qbo_audio import aplay_wav_device, aplay_wav_device_quoted
+from qbo_audio import aplay_wav_shell_play_wav, subprocess_aplay_wav
 
 
 
@@ -115,9 +115,7 @@ def _try_watson_tts(text: str, voice: str) -> bool:
 
 
 
-       subprocess.call(
-           ["aplay", "-D", aplay_wav_device(config), "/opt/qbo/sounds/watson.wav"]
-       )
+       subprocess_aplay_wav(config, "/opt/qbo/sounds/watson.wav")
        return True
 
 
@@ -145,11 +143,12 @@ def _speak_pico2wave(text: str, lang_code: str) -> None:
    clean = _clean_text(text)
    # Escape single quotes for the shell command
    clean = clean.replace("'", "'\\''")
+   _wav = "/opt/qbo/sounds/pico2wave.wav"
    cmd = (
        f"pico2wave -l \"{lang_code}\" "
-       f"-w /opt/qbo/sounds/pico2wave.wav "
+       f"-w {_wav} "
        f"\"<volume level='{config['volume']}'>{clean}\" "
-       f"&& aplay -D {aplay_wav_device_quoted(config)} /opt/qbo/sounds/pico2wave.wav"
+       f"&& {aplay_wav_shell_play_wav(config, _wav)}"
    )
    subprocess.call(cmd, shell=True)
 

@@ -5,11 +5,10 @@ from google.assistant.library.event import EventType
 import google.oauth2.credentials
 import io
 import json
-import subprocess
 import threading
 import yaml
 
-from qbo_audio import aplay_wav_device
+from qbo_audio import subprocess_aplay_wav
 
 
 class GAssistant(object):
@@ -65,9 +64,7 @@ class GAssistant(object):
 	def process_event(self, event):
 		if event.type == EventType.ON_CONVERSATION_TURN_STARTED:
 			if self.doBlip:
-				subprocess.call(
-					["aplay", "-D", aplay_wav_device(self._qbo_config), "/opt/qbo/sounds/blip_0.wav"]
-				)
+				subprocess_aplay_wav(self._qbo_config, "/opt/qbo/sounds/blip_0.wav")
 				self.doBlip = True
 			self.onConversation = True
 

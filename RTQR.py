@@ -6,7 +6,7 @@ from PIL import Image
 import cv2
 import yaml
 
-from qbo_audio import aplay_wav_device
+from qbo_audio import subprocess_aplay_wav
 
 def main():
 
@@ -61,9 +61,7 @@ def main():
 				type = info[indexEndName + 3:indexEndType]
 				password = info[indexEndType + 3:indexEndPass]
 
-				subprocess.call(
-					["aplay", "-D", aplay_wav_device(config), "/opt/qbo/sounds/blip_1.wav"]
-				)
+				subprocess_aplay_wav(config, "/opt/qbo/sounds/blip_1.wav")
 
 				wificonfig = "sudo bash /opt/qbo/scripts/WiFiAdd.sh '\"%s\"' '\"%s\"' \"%s\"" % (ssid, password, type)
 				subprocess.call(wificonfig, shell=True)

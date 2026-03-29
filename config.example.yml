@@ -40,6 +40,9 @@ dialogflowv2_projectid: ''
 
 # ----- PROFILE: ROBOT (onboard MAX98357 / Voice HAT) -----
 audioPlaybackMode: plughw
+# If you use pulse (e.g. AirPods), Pulse may be down at @reboot — auto-fallback tries onboard PCMs next.
+# Set audioPlaybackAutoFallback: false to disable. Or set exactly: audioPlaybackFallbackDevice: plughw:0,0
+#audioPlaybackAutoFallback: true
 # If you use /etc/asound.conf convertQBO instead, comment plughw and use:
 # audioPlaybackMode: convertQBO
 # Or set an explicit PCM only (then audioPlaybackMode is ignored):

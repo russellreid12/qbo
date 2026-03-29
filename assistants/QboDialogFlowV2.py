@@ -9,7 +9,7 @@ import wave
 import tempfile
 import speech_recognition as sr
 
-from qbo_audio import aplay_wav_device_quoted
+from qbo_audio import aplay_wav_shell_play_wav
 
 
 class QboDialogFlowV2(object):
@@ -142,11 +142,12 @@ class QboDialogFlowV2(object):
 
 	def SpeechText(self, text_to_speech):
 
-		d = aplay_wav_device_quoted(self.config)
+		_wav = "/opt/qbo/sounds/pico2wave.wav"
+		_play = aplay_wav_shell_play_wav(self.config, _wav)
 		if self.config["language"] == "spanish":
-			speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && aplay -D " + d + " /opt/qbo/sounds/pico2wave.wav"
+			speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play
 		else:
-			speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && aplay -D " + d + " /opt/qbo/sounds/pico2wave.wav"
+			speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play
 		subprocess.call(speak, shell=True)
 
 

@@ -6,7 +6,7 @@ import sys
 import os
 import errno
 import yaml
-from qbo_audio import aplay_wav_device_quoted
+from qbo_audio import aplay_wav_shell_play_wav
 from assistants.QboTalk import QBOtalk
 from controller.QboController import Controller
 
@@ -335,13 +335,12 @@ def CommandOK_Action():
 		talk.StartBack()
 
 	elif cmd == "youtube" and youtube_url != "":
-		_dev = aplay_wav_device_quoted(config)
+		_play = aplay_wav_shell_play_wav(config, "/tmp/song_youtube.wav")
 		subprocess.call(
 			"youtube-dl --extract-audio --audio-format wav -o \"/tmp/song_youtube.%(ext)s\" "
 			+ youtube_url
-			+ " ; aplay -D "
-			+ _dev
-			+ " /tmp/song_youtube.wav",
+			+ " ; "
+			+ _play,
 			shell=True,
 		)
 

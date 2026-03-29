@@ -17,7 +17,7 @@ class VisualRecognition:
 
 
 
-   def __init__(self, debug=False, tmp_file='/tmp/VisualRecognitionCapture.png', tfvrmodel='/opt/qbo/tfvrmodel',
+   def __init__(self, debug=False, tmp_file='/opt/qbo/VisualRecognitionCapture.png', tfvrmodel='/opt/qbo/tfvrmodel',
                 faces_dir='/opt/qbo/known_faces'):
        """
        Args:

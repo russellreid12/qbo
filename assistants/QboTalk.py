@@ -258,6 +258,7 @@ class QBOtalk(object):
              fulf = data.get("result", {}).get("fulfillment", {})
              str_resp = fulf.get("speech") or ""
          except Exception as e:
+             # Legacy apiai → api.api.ai: TLS/hostname often fails today; prefer Dialogflow V2 or empty tokenAPIai.
              print("Dialogflow / apiai error:", e)
              str_resp = str_heard
 

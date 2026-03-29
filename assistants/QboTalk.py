@@ -231,73 +231,38 @@ class QBOtalk(object):
 
 
  def Decode(self, audio):
+     str_heard = ""
      try:
          if self.config["language"] == "spanish":
-             str = self.r.recognize_google(audio, language="es-ES")
+             str_heard = self.r.recognize_google(audio, language="es-ES")
          else:
-             str = self.r.recognize_google(audio)
+             str_heard = self.r.recognize_google(audio)
+     except sr.UnknownValueError:
+         return ""
+     except sr.RequestError:
+         return "Could not request results from Speech Recognition service"
 
+     self.strAudio = str_heard
+     self.GetAudio = True
+     print("listen: " + self.strAudio)
 
-
-
-
-
-
-
-         self.strAudio = str
-         self.GetAudio = True
-
-
-
-
-
-
-
-
-         print("listen: " + self.strAudio)
-
-
-
-
-
-
-
-
-         if self.ai is None:
-             str_resp = str
-         else:
+     str_resp = ""
+     if self.ai is None:
+         str_resp = str_heard
+     else:
+         try:
              request = self.ai.text_request()
-             request.query = str
+             request.query = str_heard
              response = request.getresponse()
              data = json.loads(response.read())
-             str_resp = data["result"]["fulfillment"]["speech"]
+             fulf = data.get("result", {}).get("fulfillment", {})
+             str_resp = fulf.get("speech") or ""
+         except Exception as e:
+             print("Dialogflow / apiai error:", e)
+             str_resp = str_heard
 
-
-
-
-
-
-
-
-     except sr.UnknownValueError:
-         str_resp = ""
-
-
-
-
-
-
-
-
-     except sr.RequestError as e:
-         str_resp = "Could not request results from Speech Recognition service"
-
-
-
-
-
-
-
+     if not (str_resp or "").strip():
+         str_resp = str_heard
 
      return str_resp
 
@@ -586,18 +551,12 @@ class QBOtalk(object):
  def callback(self, recognizer, audio):
      try:
          self.Response = self.Decode(audio)
-         self.GetResponse = True
          print("Google say ")
-
-
-
-
-
-
-
-
-     except:
-         return
+     except Exception as e:
+         print("QBOtalk callback error:", e)
+         self.Response = ""
+     # Always clear — otherwise Listening stays True forever and face LEDs / hotword stay broken.
+     self.GetResponse = True
 
 
 

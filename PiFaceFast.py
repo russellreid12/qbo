@@ -15,6 +15,7 @@ import sys
 import time
 import Speak
 import _thread
+import threading
 import yaml
 from qbo_audio import subprocess_aplay_wav
 from assistants.QboTalk import QBOtalk
@@ -266,6 +267,10 @@ face_not_found_idx = 0
 mutex_wait_touch = False
 faceFound = False
 HotwordListened = False
+
+# Serialize WaitForSpeech — the main loop spawns this often; without a lock, races leave
+# Listening stuck True and face LEDs frozen after the first utterance.
+_wait_speech_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -741,88 +746,94 @@ def ServoHome():
 def WaitForSpeech():
    global WaitingSpeech, Listening, listen_thd
 
+   if not _wait_speech_lock.acquire(blocking=False):
+       return
 
-   if config["distro"] == "ibmwatson":
-       if talk.onListeningChanged:
-           talk.onListeningChanged = False
-           if talk.onListening:
-               controller.SetNoseColor(1)
-           else:
-               controller.SetNoseColor(0)
-
-
-   # FIX: use 'and' not '&' for boolean logic
-   if WaitingSpeech == False and interactiveTypeGAssistant == False:
-       WaitingSpeech = True
+   try:
+       if config["distro"] == "ibmwatson":
+           if talk.onListeningChanged:
+               talk.onListeningChanged = False
+               if talk.onListening:
+                   controller.SetNoseColor(1)
+               else:
+                   controller.SetNoseColor(0)
 
 
-       if Listening == False:
+       # FIX: use 'and' not '&' for boolean logic
+       if WaitingSpeech == False and interactiveTypeGAssistant == False:
+           WaitingSpeech = True
+
+
+           if Listening == False:
+               WaitingSpeech = False
+               return
+
+
+           elif config["distro"] != "ibmwatson" and vc.askAboutMe(talk.strAudio):
+               talk.GetResponse = False
+
+
+               print("Started visual recognition")
+               subprocess_aplay_wav(config, "/opt/qbo/sounds/blip_0.wav")
+
+
+               # Capture + run both object detection AND face recognition together
+               vc.captureImage(webcam)
+               vc.recognizeImage()
+               vc.recognizeFaces()
+
+
+               # Build a response that only mentions people, not objects
+               spoken = None
+               if vc.faceResultsAvailable and vc.faceResults:
+                   known = [n for n in vc.faceResults if n != "Unknown"]
+                   if known:
+                       lang = config.get("language", "english")
+                       if lang == "spanish":
+                           spoken = "Veo a {}.".format(", ".join(known))
+                       else:
+                           spoken = "I see {}.".format(", ".join(known))
+
+
+               # Fall back to object label only if no person was identified
+               if spoken is None and vc.resultsAvailable and vc.results:
+                   spoken = vc.results[0]
+
+
+               if spoken:
+                   print("Visual recognition response: {}".format(spoken))
+                   talk.SpeechText(spoken)
+                   vc.resultsAvailable = False
+                   vc.faceResultsAvailable = False
+
+
+               talk.strAudio = " "
+               talk.GetAudio = False
+               talk.GetResponse = False
+
+
+           elif talk.GetResponse == True:
+               if config["distro"] != "ibmwatson" and listen_thd:
+                   listen_thd(wait_for_stop=True)
+
+
+               if len(talk.Response) > 0:
+                   talk.SpeechText(talk.Response)
+
+
+               if config["distro"] != "ibmwatson":
+                   controller.SetNoseColor(0)
+
+
+               talk.GetResponse = False
+               Listening = False
+               StartHotwordListener()
+
+
            WaitingSpeech = False
-           return
 
-
-       elif config["distro"] != "ibmwatson" and vc.askAboutMe(talk.strAudio):
-           talk.GetResponse = False
-
-
-           print("Started visual recognition")
-           subprocess_aplay_wav(config, "/opt/qbo/sounds/blip_0.wav")
-
-
-           # Capture + run both object detection AND face recognition together
-           vc.captureImage(webcam)
-           vc.recognizeImage()
-           vc.recognizeFaces()
-
-
-           # Build a response that only mentions people, not objects
-           spoken = None
-           if vc.faceResultsAvailable and vc.faceResults:
-               known = [n for n in vc.faceResults if n != "Unknown"]
-               if known:
-                   lang = config.get("language", "english")
-                   if lang == "spanish":
-                       spoken = "Veo a {}.".format(", ".join(known))
-                   else:
-                       spoken = "I see {}.".format(", ".join(known))
-
-
-           # Fall back to object label only if no person was identified
-           if spoken is None and vc.resultsAvailable and vc.results:
-               spoken = vc.results[0]
-
-
-           if spoken:
-               print("Visual recognition response: {}".format(spoken))
-               talk.SpeechText(spoken)
-               vc.resultsAvailable = False
-               vc.faceResultsAvailable = False
-
-
-           talk.strAudio = " "
-           talk.GetAudio = False
-           talk.GetResponse = False
-
-
-       elif talk.GetResponse == True:
-           if config["distro"] != "ibmwatson":
-               listen_thd(wait_for_stop=True)
-
-
-           if len(talk.Response) > 0:
-               talk.SpeechText(talk.Response)
-
-
-           if config["distro"] != "ibmwatson":
-               controller.SetNoseColor(0)
-
-
-           talk.GetResponse = False
-           Listening = False
-           StartHotwordListener()
-
-
-       WaitingSpeech = False
+   finally:
+       _wait_speech_lock.release()
 
 
 
@@ -1065,7 +1076,7 @@ while True:
            print("Face found -> DETECTING (green)")
 
 
-           if config["distro"] != "ibmwatson" and not Listening:
+           if config["distro"] != "ibmwatson":
                controller.SetNoseColor(4)  # Green
 
 
@@ -1076,7 +1087,7 @@ while True:
 
        # ---- State machine: DETECTING -> LOCKED ----
        elif track_state == TRACK_DETECTING:
-           if config["distro"] != "ibmwatson" and not Listening:
+           if config["distro"] != "ibmwatson":
                controller.SetNoseColor(4)  # Stay green while detecting
 
 

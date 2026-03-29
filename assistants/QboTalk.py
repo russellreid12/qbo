@@ -176,7 +176,9 @@ class QBOtalk(object):
      with _suppress_c_stderr():
          mic_names = sr.Microphone.list_microphone_names()
      for i, mic_name in enumerate(mic_names):
-         if mic_name and any(known in mic_name.lower() for known in QBO_MIC_NAMES):
+         if not mic_name or "_hw" in mic_name.lower() or "hw:" in mic_name.lower():
+             continue
+         if any(known in mic_name.lower() for known in QBO_MIC_NAMES):
              mic_index = i
              break
 

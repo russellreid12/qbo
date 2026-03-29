@@ -82,6 +82,7 @@ class Controller(object):
       "SET_ENABLE_SPEAKER": (0x86, 1, 0),
       "SET_MEAN_RMS": (0x87, 6, 0),
       "SET_USB2SERVO_FWD": (0x88, 1, 0),
+      "SET_TOUCH_AUTO_OFF": (0x90, 4, 0),
       "RESET_SOUND": (0x8F, 5, 0)}
 
 
@@ -461,6 +462,14 @@ class Controller(object):
       """Tell head MCU to enable (1) or disable (0) the speaker path; QBO may be silent without this."""
       b = 1 if enable else 0
       return self.GetHeadCmd("SET_ENABLE_SPEAKER", [b])
+
+  def SetTouchAutoOff(self, enable, delay_ms, trig_angle):
+      """Configure Arduino firmware touch lockout during servo movement.
+      enable: 1 (servo 1), 2 (servo 2), 3 (both), 0 (disable)
+      delay_ms: time to wait after stop
+      trig_angle: min movement to trigger lockout"""
+      cmd_buffer = ([enable & 0xFF, delay_ms & 0xFF, (delay_ms >> 8) & 0xFF, trig_angle & 0xFF])
+      return self.SendCmdQBO(Command(self.cmd_params["SET_TOUCH_AUTO_OFF"][0], 4, cmd_buffer))
 
 
 

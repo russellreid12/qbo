@@ -365,6 +365,11 @@ try:
 except Exception as e:
    print("SetEnableSpeaker: %s" % e)
 
+try:
+   controller.SetTouchAutoOff(0, 0, 0)
+except Exception as e:
+   print("SetTouchAutoOff error: %s" % e)
+
 
 try:
    controller.SetMicrophoneGain(config['microphoneGain'])
@@ -1191,7 +1196,7 @@ while True:
        time.sleep(0.002)
 
 
-       if touch_tm == 0 and qbo_touch:
+       if touch_tm == 0 and qbo_touch and qbo_touch != [0]:
            _touch_reaction_lights_on()
            if qbo_touch == [1]:
                controller.SetServo(1, Xmax - 25, int(config["servoSpeed"]))

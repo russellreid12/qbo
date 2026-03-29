@@ -5,6 +5,7 @@ numpy
 SpeechRecognition
 sounddevice
 openwakeword
+apiai
 
 # Optional / legacy dependencies:
 # - google-assistant-sdk, ibm-watson, dialogflow, mycroft-core (only if you enable those modes)

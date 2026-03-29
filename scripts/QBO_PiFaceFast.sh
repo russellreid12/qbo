@@ -20,8 +20,16 @@ if [[ $1 = $START ]]; then
 	else
 		echo "launching PiFaceFast"
 		PYTHONHTTPSVERIFY=0
-		python3 /opt/qbo/PiFaceFast.py &
-        #/opt/qbo/PiFaceFast.py > /dev/null &
+		# Cron runs as user qbo with bare python3 — use a venv if present (same deps as dev).
+		if [ -x /opt/qbo/qbo_venv/bin/python3 ]; then
+			/opt/qbo/qbo_venv/bin/python3 /opt/qbo/PiFaceFast.py &
+		elif [ -x "${HOME}/qbo_venv/bin/python3" ]; then
+			"${HOME}/qbo_venv/bin/python3" /opt/qbo/PiFaceFast.py &
+		elif [ -x /home/pi/qbo_venv/bin/python3 ]; then
+			/home/pi/qbo_venv/bin/python3 /opt/qbo/PiFaceFast.py &
+		else
+			python3 /opt/qbo/PiFaceFast.py &
+		fi
 	fi
 fi
 

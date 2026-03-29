@@ -10,6 +10,16 @@ DEFAULT_AUDIO_PLAYBACK_MODE = "convertQBO"
 _AUTO_FALLBACK_ORDER = ("plughw:0,0", "plughw:1,0", "convertQBO")
 
 
+def _primary_uses_session_audio(primary: str) -> bool:
+    """True if this PCM typically needs PipeWire/Pulse (often missing at @reboot / for user qbo)."""
+    p = (primary or "").lower().strip()
+    if p in ("pulse", "default", "sysdefault"):
+        return True
+    if "pulse" in p or "pipewire" in p:
+        return True
+    return False
+
+
 def _aplay_wav_primary_device(config):
     """
     PCM name for: aplay -D <name> file.wav
@@ -58,8 +68,7 @@ def aplay_wav_devices_to_try(config):
         return out
     if config.get("audioPlaybackAutoFallback") is False:
         return out
-    pl = primary.lower()
-    if pl in ("pulse", "default"):
+    if _primary_uses_session_audio(primary):
         for d in _AUTO_FALLBACK_ORDER:
             if d not in out:
                 out.append(d)
@@ -73,12 +82,17 @@ def aplay_wav_device_quoted(config):
 
 def aplay_wav_shell_play_wav(config, wav_path: str) -> str:
     """
-    Shell fragment: play wav with aplay, trying each PCM until one succeeds (-q hides
-    ALSA errors from failed attempts).
+    Shell fragment: play wav with aplay, trying each PCM until one succeeds.
+    Stderr from failed tries is discarded so ALSA pulse.c noise does not fill logs
+    when onboard audio succeeds next.
     """
     wav_q = shlex.quote(wav_path)
     devs = aplay_wav_devices_to_try(config)
-    parts = ["aplay -q -D {} {}".format(shlex.quote(d), wav_q) for d in devs]
+    parts = []
+    for i, d in enumerate(devs):
+        # Only the last attempt keeps stderr (easier debugging if everything fails).
+        redir = " 2>/dev/null" if i + 1 < len(devs) else ""
+        parts.append("aplay -q -D {} {}{}".format(shlex.quote(d), wav_q, redir))
     if len(parts) == 1:
         return parts[0]
     return "(" + " || ".join(parts) + ")"
@@ -87,8 +101,12 @@ def aplay_wav_shell_play_wav(config, wav_path: str) -> str:
 def subprocess_aplay_wav(config, path: str, quiet: bool = True) -> int:
     """Try each PCM from aplay_wav_devices_to_try; return 0 if any aplay succeeds."""
     prefix = ["aplay"] + (["-q"] if quiet else []) + ["-D"]
-    for dev in aplay_wav_devices_to_try(config):
-        r = subprocess.call(prefix + [dev, path])
+    devs = aplay_wav_devices_to_try(config)
+    for i, dev in enumerate(devs):
+        kwargs = {}
+        if i + 1 < len(devs):
+            kwargs["stderr"] = subprocess.DEVNULL
+        r = subprocess.call(prefix + [dev, path], **kwargs)
         if r == 0:
             return 0
     return 1
@@ -97,7 +115,10 @@ def subprocess_aplay_wav(config, path: str, quiet: bool = True) -> int:
 def aplay_stdin_shell_play_chain(config) -> str:
     """Shell fragment: read raw audio from stdin (e.g. espeak | aplay), try each PCM."""
     devs = aplay_wav_devices_to_try(config)
-    parts = ["aplay -q -D {} -".format(shlex.quote(d)) for d in devs]
+    parts = []
+    for i, d in enumerate(devs):
+        redir = " 2>/dev/null" if i + 1 < len(devs) else ""
+        parts.append("aplay -q -D {} -{}".format(shlex.quote(d), redir))
     if len(parts) == 1:
         return parts[0]
     return "(" + " || ".join(parts) + ")"

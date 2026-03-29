@@ -12,6 +12,32 @@ time.sleep(5)
 config = yaml.safe_load(open("/opt/qbo/config.yml"))
 _aplay_d = aplay_wav_device_quoted(config)
 
+
+def _enable_qbo_speaker_before_tts(cfg):
+	"""Head MCU keeps the amp muted until this runs; PiFaceFast does it later, but boot TTS uses Start.py first."""
+	try:
+		import serial
+		from controller.QboController import Controller
+		port = cfg.get("serialPort", "/dev/serial0")
+		ser = serial.Serial(
+			port,
+			baudrate=115200,
+			bytesize=serial.EIGHTBITS,
+			stopbits=serial.STOPBITS_ONE,
+			parity=serial.PARITY_NONE,
+			rtscts=False,
+			dsrdtr=False,
+			timeout=0.1,
+		)
+		ctrl = Controller(ser)
+		ctrl.SetEnableSpeaker(True)
+		ser.close()
+	except Exception as e:
+		print("Start.py: could not enable QBO speaker over serial:", e)
+
+
+_enable_qbo_speaker_before_tts(config)
+
 if config["language"] == "spanish":
 	text = "Hola. Soy Cubo."
 	speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(config["volume"]) + "'>" + text + "\" && aplay -D " + _aplay_d + " /opt/qbo/sounds/pico2wave.wav"

@@ -24,6 +24,12 @@ servoSpeed: 100
 SpeechToTextListeningTime: 5
 serialPort: /dev/serial0
 
+# Touch sensors (GET_TOUCH): flash nose + servo LEDs when petted; off again after touch cooldown (PiFaceFast).
+touchReactionLights: true
+touchReactionServoLeds: true
+# Nose color: 0=off, 1=blue, 2=orange, 4=green (same as SetNoseColor elsewhere).
+touchNoseColor: 2
+
 tokenAPIai: ''
 gassistant_proyectid: ''
 dialogflowv2_projectid: ''

@@ -380,6 +380,36 @@ time.sleep(1)
 controller.SetNoseColor(0)
 
 
+def _touch_reaction_lights_on():
+   """Nose + servo ring LEDs on capacitive touch (GET_TOUCH 1/2/3)."""
+   if not _cfg_bool(config.get("touchReactionLights"), True):
+       return
+   if config["distro"] != "ibmwatson":
+       try:
+           controller.SetNoseColor(int(config.get("touchNoseColor", 2)))
+       except (TypeError, ValueError):
+           controller.SetNoseColor(2)
+   if _cfg_bool(config.get("touchReactionServoLeds"), True):
+       try:
+           controller.GetHeadCmd("SET_SERVO_LED", [1, 1])
+           controller.GetHeadCmd("SET_SERVO_LED", [2, 1])
+       except Exception:
+           pass
+
+
+def _touch_reaction_lights_off():
+   if not _cfg_bool(config.get("touchReactionLights"), True):
+       return
+   if _cfg_bool(config.get("touchReactionServoLeds"), True):
+       try:
+           controller.GetHeadCmd("SET_SERVO_LED", [1, 0])
+           controller.GetHeadCmd("SET_SERVO_LED", [2, 0])
+       except Exception:
+           pass
+   if config["distro"] != "ibmwatson":
+       controller.SetNoseColor(0)
+
+
 webcam, frame_w, frame_h = _open_camera(config["camera"])
 if webcam is None:
    print("FATAL: Camera could not capture frames. Set 'camera' in config.yml (often 2 on Pi 5).")
@@ -1153,6 +1183,7 @@ while True:
 
 
        if touch_tm == 0 and qbo_touch:
+           _touch_reaction_lights_on()
            if qbo_touch == [1]:
                controller.SetServo(1, Xmax - 25, int(config["servoSpeed"]))
                time.sleep(0.002)
@@ -1179,6 +1210,7 @@ while True:
    if touch_tm != 0 and time.time() - touch_tm > touch_wait:
        print("touch ready")
        touch_tm = 0
+       _touch_reaction_lights_off()
 
 
    # Throttle main loop to ~30 Hz max

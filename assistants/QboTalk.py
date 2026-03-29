@@ -7,7 +7,6 @@
 
 
 
-import apiai
 import json
 import os
 try:
@@ -16,6 +15,10 @@ except ImportError:
  # The robot depends on this at runtime; if it's missing we avoid crashing
  # at import-time so other modes/tools can still run.
  sr = None
+try:
+ import apiai  # type: ignore[import-not-found]
+except ImportError:
+ apiai = None
 import subprocess
 import wave
 import yaml
@@ -122,7 +125,12 @@ class QBOtalk(object):
 
      self.config = yaml.safe_load(open("/opt/qbo/config.yml"))
      self.r = sr.Recognizer() if sr is not None else None
-     self.ai = apiai.ApiAI(self.config["tokenAPIai"]) if sr is not None else None
+     if sr is not None and apiai is not None:
+         self.ai = apiai.ApiAI(self.config["tokenAPIai"])
+     else:
+         self.ai = None
+         if sr is not None and apiai is None:
+             print("Warning: 'apiai' not installed; install with pip (see requirements-robot.txt).")
      self.Response = "hello"
      self.GetResponse = False
      self.GetAudio = False
@@ -255,11 +263,14 @@ class QBOtalk(object):
 
 
 
-         request = self.ai.text_request()
-         request.query = str
-         response = request.getresponse()
-         data = json.loads(response.read())
-         str_resp = data["result"]["fulfillment"]["speech"]
+         if self.ai is None:
+             str_resp = str
+         else:
+             request = self.ai.text_request()
+             request.query = str
+             response = request.getresponse()
+             data = json.loads(response.read())
+             str_resp = data["result"]["fulfillment"]["speech"]
 
 
 

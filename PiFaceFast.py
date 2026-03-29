@@ -17,7 +17,6 @@ import Speak
 import _thread
 import yaml
 from qbo_audio import aplay_wav_device
-from assistants.QboWatson import QBOWatson
 from assistants.QboTalk import QBOtalk
 from assistants.QboTalkMycroft import QBOtalkMycroft
 from controller.QboController import Controller
@@ -103,6 +102,9 @@ if config["distro"] == "ibmwatson":
            "Acceda al panel web, complete los datos y presione sobre Guardar y reiniciar.", True)
        exit(0)
 
+
+   # Lazy import: ibm-watson stack only needed when distro == ibmwatson.
+   from assistants.QboWatson import QBOWatson
 
    talk = QBOWatson()
    interactiveTypeGAssistant = False

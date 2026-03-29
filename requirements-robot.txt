@@ -3,9 +3,11 @@ pyserial
 PyYAML
 numpy
 SpeechRecognition
+PyAudio
 sounddevice
 openwakeword
 apiai
 
 # Optional / legacy dependencies:
-# - google-assistant-sdk, ibm-watson, dialogflow, mycroft-core (only if you enable those modes)
+# - google-assistant-sdk, dialogflow, mycroft-core (only if you enable those modes)
+# - ibm-watson (+ ibm-cloud-sdk-core): pip install ibm-watson — only if config distro == ibmwatson

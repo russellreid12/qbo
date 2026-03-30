@@ -363,6 +363,8 @@ controller = Controller(ser)
 
 if talk and hasattr(talk, "set_controller"):
     talk.set_controller(controller)
+
+Speak.set_controller(controller)
 vc = VisualRecognition()
 
 try:

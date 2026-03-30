@@ -8,6 +8,9 @@ import sys
 import re
 import yaml
 import subprocess
+import threading
+import time
+import random
 
 from qbo_audio import aplay_wav_shell_play_wav, subprocess_aplay_wav
 
@@ -32,6 +35,26 @@ VOICES = {
 # SSML templates give the TTS engine extra pronunciation hints.
 # Wrap text in <speak> and add optional pauses, emphasis, or rate tweaks here.
 SSML_TEMPLATE = '<speak>{}</speak>'
+
+# Global controller for mouth sync
+controller = None
+is_animating = False
+
+def set_controller(ctrl):
+    global controller
+    controller = ctrl
+
+def _animate_mouth_loop():
+    """Flickers the mouth LEDs while is_animating is True."""
+    global is_animating
+    mouth_patterns = [0x110E00, 0x0E1100, 0x1F1F00, 0x1B1F0E04]
+    while is_animating:
+        if controller:
+            pattern = random.choice(mouth_patterns)
+            controller.SetMouth(pattern)
+        time.sleep(0.15)
+    if controller:
+        controller.SetMouth(0)
 
 
 
@@ -115,8 +138,18 @@ def _try_watson_tts(text: str, voice: str) -> bool:
 
 
 
-       subprocess_aplay_wav(config, "/opt/qbo/sounds/watson.wav")
-       return True
+        global is_animating
+        is_animating = True
+        anim_thread = threading.Thread(target=_animate_mouth_loop)
+        anim_thread.daemon = True
+        anim_thread.start()
+
+        try:
+            subprocess_aplay_wav(config, "/opt/qbo/sounds/watson.wav")
+        finally:
+            is_animating = False
+            anim_thread.join(timeout=1.0)
+        return True
 
 
 
@@ -150,10 +183,17 @@ def _speak_pico2wave(text: str, lang_code: str) -> None:
        f"\"<volume level='{config['volume']}'>{clean}\" "
        f"&& {aplay_wav_shell_play_wav(config, _wav)}"
    )
-   subprocess.call(cmd, shell=True)
+    global is_animating
+    is_animating = True
+    anim_thread = threading.Thread(target=_animate_mouth_loop)
+    anim_thread.daemon = True
+    anim_thread.start()
 
-
-
+    try:
+        subprocess.call(cmd, shell=True)
+    finally:
+        is_animating = False
+        anim_thread.join(timeout=1.0)
 
 
 

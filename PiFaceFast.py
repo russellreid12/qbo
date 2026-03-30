@@ -108,6 +108,7 @@ if config["distro"] == "ibmwatson":
    from assistants.QboWatson import QBOWatson
 
    talk = QBOWatson()
+   # talk.set_controller(controller) will be called after controller is defined below
    interactiveTypeGAssistant = False
 
 
@@ -124,6 +125,7 @@ else:
    if config["startWith"] == "interactive-dialogflow":
        print("Mode: Dialogflow")
        talk = QBOtalk()
+       # talk.set_controller(controller) will be called after controller is defined below
        interactiveTypeGAssistant = False
 
 
@@ -358,6 +360,9 @@ except Exception:
 
 
 controller = Controller(ser)
+
+if talk and hasattr(talk, "set_controller"):
+    talk.set_controller(controller)
 vc = VisualRecognition()
 
 try:

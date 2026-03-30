@@ -22,6 +22,9 @@ except ImportError:
 import subprocess
 import wave
 import yaml
+import threading
+import time
+import random
 from contextlib import contextmanager
 
 from qbo_audio import aplay_wav_shell_play_wav
@@ -111,10 +114,16 @@ class QBOtalk(object):
 
 
 
- def __init__(self):
+ def __init__(self, controller=None):
      # Always define attributes up-front so later code can't fail with
      # AttributeError even if initialization steps raise/short-circuit.
      self.m = None
+     self.controller = controller
+     self.is_animating = False
+
+  def set_controller(self, controller):
+      """Accepts a serial controller instance for hardware sync (like mouth LEDs)."""
+      self.controller = controller
 
 
 
@@ -431,94 +440,75 @@ class QBOtalk(object):
 
 
 
- def _play_pico2wave(self, text, lang):
-     """
-     Play TTS from pico2wave on Google Voice HAT / Pi 5.
+  def _animate_mouth_loop(self):
+      """Flickers the mouth LEDs while is_animating is True."""
+      # Different 'mouth opening' patterns
+      mouth_patterns = [
+          0x110E00,  # Smile/Open
+          0x0E1100,  # Narrow
+          0x1F1F00,  # Serious/Open
+          0x1B1F0E04 # Love/Extra
+      ]
+      while self.is_animating:
+          if self.controller:
+              pattern = random.choice(mouth_patterns)
+              self.controller.SetMouth(pattern)
+          time.sleep(0.15) # Flicker speed
+      
+      # Clear mouth when done
+      if self.controller:
+          self.controller.SetMouth(0)
 
+  def _play_pico2wave(self, text, lang):
+      """
+      Internal helper to generate pico2wave.wav and play it via aplay.
+      If audio got worse: remove audioPlaybackMode / audioPlaybackGainDb lines
+      so TTS uses plain pico2wave + plughw again.
+      """
+      vol = self.config["volume"]
+      wav = "/opt/qbo/sounds/pico2wave.wav"
+      mode = str(self.config.get("audioPlaybackMode", "plughw")).lower()
 
+      gen = (
+          'pico2wave -l "{lang}" -w {wav} "<volume level=\'{vol}\'>{text}"'
+      ).format(lang=lang, wav=wav, vol=vol, text=text)
 
+      hw = self.config.get("audioPlaybackHwDevice", "hw:0,0")
+      try:
+          gain_db = float(self.config.get("audioPlaybackGainDb", 0))
+      except (TypeError, ValueError):
+          gain_db = 0.0
+      gain_sox = " gain {:.1f}".format(gain_db) if gain_db != 0 else ""
 
+      if mode == "hq48":
+          # Bypass ALSA resampling: sox rate -v + gain (clip often sounds like noise).
+          cmd = (
+              "{gen} && sox {wav} -t raw -e signed-integer -b 32 -c 2 - rate -v 48000{gain} "
+              "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
+          ).format(gen=gen, wav=wav, hw=hw, gain=gain_sox)
+      elif mode == "raw48":
+          g0 = ("gain {:.1f} ".format(gain_db) if gain_db != 0 else "")
+          cmd = (
+              "{gen} && sox {wav} {g0}-t raw -r 48000 -e signed-integer -b 32 -c 2 - "
+              "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
+          ).format(gen=gen, wav=wav, hw=hw, g0=g0)
+      else:
+          cmd = "{gen} && {aplay}".format(
+              gen=gen, aplay=aplay_wav_shell_play_wav(self.config, wav)
+          )
 
+      # Start mouth animation
+      self.is_animating = True
+      anim_thread = threading.Thread(target=self._animate_mouth_loop)
+      anim_thread.daemon = True
+      anim_thread.start()
 
-
-
-     config.yml (all optional):
-       audioPlaybackMode: plughw          # default in code — simplest
-       audioPlaybackDevice: plughw:0,0
-       # Only if plughw is unusable: audioPlaybackMode: hq48
-       # Only if hq48 clips: audioPlaybackGainDb: -6
-
-
-
-
-
-
-
-
-     If audio got worse: remove audioPlaybackMode / audioPlaybackGainDb lines
-     so TTS uses plain pico2wave + plughw again.
-     """
-     vol = self.config["volume"]
-     wav = "/opt/qbo/sounds/pico2wave.wav"
-     mode = str(self.config.get("audioPlaybackMode", "plughw")).lower()
-
-
-
-
-
-
-
-
-     gen = (
-         'pico2wave -l "{lang}" -w {wav} "<volume level=\'{vol}\'>{text}"'
-     ).format(lang=lang, wav=wav, vol=vol, text=text)
-
-
-
-
-
-
-
-
-     hw = self.config.get("audioPlaybackHwDevice", "hw:0,0")
-     try:
-         gain_db = float(self.config.get("audioPlaybackGainDb", 0))
-     except (TypeError, ValueError):
-         gain_db = 0.0
-     gain_sox = " gain {:.1f}".format(gain_db) if gain_db != 0 else ""
-
-
-
-
-
-
-
-
-     if mode == "hq48":
-         # Bypass ALSA resampling: sox rate -v + gain (clip often sounds like noise).
-         cmd = (
-             "{gen} && sox {wav} -t raw -e signed-integer -b 32 -c 2 - rate -v 48000{gain} "
-             "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
-         ).format(gen=gen, wav=wav, hw=hw, gain=gain_sox)
-     elif mode == "raw48":
-         g0 = ("gain {:.1f} ".format(gain_db) if gain_db != 0 else "")
-         cmd = (
-             "{gen} && sox {wav} {g0}-t raw -r 48000 -e signed-integer -b 32 -c 2 - "
-             "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
-         ).format(gen=gen, wav=wav, hw=hw, g0=g0)
-     else:
-         cmd = "{gen} && {aplay}".format(
-             gen=gen, aplay=aplay_wav_shell_play_wav(self.config, wav)
-         )
-
-
-
-
-
-
-
-
-     subprocess.call(cmd, shell=True)
+      try:
+          subprocess.call(cmd, shell=True)
+      finally:
+          # Stop mouth animation
+          self.is_animating = False
+          anim_thread.join(timeout=1.0)
 
 
 

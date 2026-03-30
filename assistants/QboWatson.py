@@ -8,6 +8,7 @@ import tempfile
 import yaml
 import threading
 import time
+import random
 
 
 # Migrated from watson_developer_cloud to ibm_watson + ibm_cloud_sdk_core
@@ -33,6 +34,12 @@ class QBOWatson(object):
        self.Response = "hello"
        self.GetResponse = False
        self.webcam = None
+       self.controller = None
+       self.is_animating = False
+
+   def set_controller(self, controller):
+       """Bind the hardware controller for mouth sync animations."""
+       self.controller = controller
 
 
        self.onListening = False
@@ -241,6 +248,17 @@ class QBOWatson(object):
        return 0
 
 
+   def _animate_mouth_loop(self):
+       """Flickers the mouth LEDs while is_animating is True."""
+       mouth_patterns = [0x110E00, 0x0E1100, 0x1F1F00, 0x1B1F0E04]
+       while self.is_animating:
+           if self.controller:
+               pattern = random.choice(mouth_patterns)
+               self.controller.SetMouth(pattern)
+           time.sleep(0.15)
+       if self.controller:
+           self.controller.SetMouth(0)
+
    def SpeechText(self, text):
 
 
@@ -258,15 +276,6 @@ class QBOWatson(object):
                        voice=voice
                    ).get_result().content
                )
-
-
-           subprocess_aplay_wav(self.config, "/opt/qbo/sounds/watson.wav")
-       except Exception as e:
-           print("WATSON SPEAK ERROR: %s" % e)
-
-
-
-
 
 
 

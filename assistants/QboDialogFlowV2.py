@@ -7,6 +7,9 @@ import subprocess
 import pyaudio
 import wave
 import tempfile
+import threading
+import time
+import random
 import speech_recognition as sr
 
 from qbo_audio import aplay_wav_shell_play_wav
@@ -28,6 +31,12 @@ class QboDialogFlowV2(object):
 		self.strAudio = ""
 		self.GetAudio = False
 		self.r = sr.Recognizer()
+		self.controller = None
+		self.is_animating = False
+
+	def set_controller(self, controller):
+		"""Bind the hardware controller for mouth sync animations."""
+		self.controller = controller
 
 	def record_wav(self):
 		audio = pyaudio.PyAudio()
@@ -140,6 +149,17 @@ class QboDialogFlowV2(object):
 		self.SpeechText(dialogflowResponse)
 		os.remove(self.audio_file_path)
 
+	def _animate_mouth_loop(self):
+		"""Flickers the mouth LEDs while is_animating is True."""
+		mouth_patterns = [0x110E00, 0x0E1100, 0x1F1F00, 0x1B1F0E04]
+		while self.is_animating:
+			if self.controller:
+				pattern = random.choice(mouth_patterns)
+				self.controller.SetMouth(pattern)
+			time.sleep(0.15)
+		if self.controller:
+			self.controller.SetMouth(0)
+
 	def SpeechText(self, text_to_speech):
 
 		_wav = "/opt/qbo/sounds/pico2wave.wav"
@@ -148,7 +168,18 @@ class QboDialogFlowV2(object):
 			speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play
 		else:
 			speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play
-		subprocess.call(speak, shell=True)
+
+		# Start mouth animation
+		self.is_animating = True
+		anim_thread = threading.Thread(target=self._animate_mouth_loop)
+		anim_thread.daemon = True
+		anim_thread.start()
+
+		try:
+			subprocess.call(speak, shell=True)
+		finally:
+			self.is_animating = False
+			anim_thread.join(timeout=1.0)
 
 
 if __name__ == '__main__':

@@ -16,13 +16,11 @@ from qbo_audio import aplay_wav_shell_play_wav
 
 
 class QboDialogFlowV2(object):
-
 	def __init__(self, credentialFile="/opt/qbo/.config/dialogflowv2.json"):
 		self.config = yaml.safe_load(open("/opt/qbo/config.yml"))
 		self.project_id = self.config["dialogflowv2_projectid"]
 		self.credentialFile = credentialFile
 		os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentialFile
-
 		self.FORMAT = pyaudio.paInt16
 		self.CHANNELS = 1
 		self.RATE = 16000

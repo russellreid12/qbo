@@ -103,74 +103,52 @@ def open_microphone_source(mic):
 
 
 
-
+    """
+    Enter sr.Microphone safely. Some speech_recognition versions swallow
+    PyAudio open() errors in __enter__ and return with stream=None; then
+    adjust_for_ambient_noise asserts and __exit__ raises on close(None).
+    """
+    if mic is None:
+        raise ValueError("microphone is None")
+    src = mic.__enter__()
+    try:
+        if getattr(src, "stream", None) is None:
+            raise OSError(
+                "Microphone stream did not open (ALSA/PortAudio). "
+                "Try arecord -l, ~/.asoundrc, and config.yml "
+                "microphoneDeviceIndex / microphoneSampleRate."
+            )
+        yield src
+    finally:
+        if getattr(src, "stream", None) is not None:
+            src.__exit__(None, None, None)
+        else:
+            audio = getattr(src, "audio", None)
+            if audio is not None:
+                try:
+                    audio.terminate()
+                except Exception:
+                    pass
 
 class QBOtalk(object):
-
-
-
-
-
-
-
-
- def __init__(self, controller=None):
-     # Always define attributes up-front so later code can't fail with
-     # AttributeError even if initialization steps raise/short-circuit.
-     self.m = None
-     self.controller = controller
-     self.is_animating = False
+  def __init__(self, controller=None):
+      self.m = None
+      self.controller = controller
+      self.is_animating = False
+      self.config = yaml.safe_load(open("/opt/qbo/config.yml"))
+      self.r = sr.Recognizer() if sr is not None else None
+      if sr is not None and apiai is not None:
+          self.ai = apiai.ApiAI(self.config["tokenAPIai"])
+      else:
+          self.ai = None
+      self.Response = "hello"
+      self.GetResponse = False
+      self.GetAudio = False
+      self.strAudio = ""
 
   def set_controller(self, controller):
-      """Accepts a serial controller instance for hardware sync (like mouth LEDs)."""
+      """Accepts a serial controller instance for hardware sync."""
       self.controller = controller
-
-
-
-
-
-
-
-
-     self.config = yaml.safe_load(open("/opt/qbo/config.yml"))
-     self.r = sr.Recognizer() if sr is not None else None
-     if sr is not None and apiai is not None:
-         self.ai = apiai.ApiAI(self.config["tokenAPIai"])
-     else:
-         self.ai = None
-         if sr is not None and apiai is None:
-             print("Warning: 'apiai' not installed; install with pip (see requirements-robot.txt).")
-     self.Response = "hello"
-     self.GetResponse = False
-     self.GetAudio = False
-     self.strAudio = ""
-
-
-
-
-
-
-
-
-     if sr is None:
-         print("Warning: 'speech_recognition' module not installed; speech capture disabled.")
-         return
-
-
-
-
-
-
-
-
-     # Optional overrides for Pi / ALSA (channel or rate mismatches).
-     cfg_mic_index = _config_int_optional(self.config, "microphoneDeviceIndex")
-     cfg_sample_rate = _config_int_optional(self.config, "microphoneSampleRate")
-
-
-
-
-     # Try to find the QBO microphone by name. Accept any of the known
      # device names used across different QBO hardware revisions.
      QBO_MIC_NAMES = (
          "dmicQBO_sv",
@@ -442,37 +420,22 @@ class QBOtalk(object):
 
   def _animate_mouth_loop(self):
       """Flickers the mouth LEDs while is_animating is True."""
-      # Different 'mouth opening' patterns
-      mouth_patterns = [
-          0x110E00,  # Smile/Open
-          0x0E1100,  # Narrow
-          0x1F1F00,  # Serious/Open
-          0x1B1F0E04 # Love/Extra
-      ]
+      mouth_patterns = [0x110E00, 0x0E1100, 0x1F1F00, 0x1B1F0E04]
       while self.is_animating:
           if self.controller:
               pattern = random.choice(mouth_patterns)
               self.controller.SetMouth(pattern)
-          time.sleep(0.15) # Flicker speed
-      
-      # Clear mouth when done
+          time.sleep(0.15)
       if self.controller:
           self.controller.SetMouth(0)
 
   def _play_pico2wave(self, text, lang):
-      """
-      Internal helper to generate pico2wave.wav and play it via aplay.
-      If audio got worse: remove audioPlaybackMode / audioPlaybackGainDb lines
-      so TTS uses plain pico2wave + plughw again.
-      """
       vol = self.config["volume"]
       wav = "/opt/qbo/sounds/pico2wave.wav"
       mode = str(self.config.get("audioPlaybackMode", "plughw")).lower()
-
       gen = (
           'pico2wave -l "{lang}" -w {wav} "<volume level=\'{vol}\'>{text}"'
       ).format(lang=lang, wav=wav, vol=vol, text=text)
-
       hw = self.config.get("audioPlaybackHwDevice", "hw:0,0")
       try:
           gain_db = float(self.config.get("audioPlaybackGainDb", 0))
@@ -481,7 +444,6 @@ class QBOtalk(object):
       gain_sox = " gain {:.1f}".format(gain_db) if gain_db != 0 else ""
 
       if mode == "hq48":
-          # Bypass ALSA resampling: sox rate -v + gain (clip often sounds like noise).
           cmd = (
               "{gen} && sox {wav} -t raw -e signed-integer -b 32 -c 2 - rate -v 48000{gain} "
               "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
@@ -497,16 +459,13 @@ class QBOtalk(object):
               gen=gen, aplay=aplay_wav_shell_play_wav(self.config, wav)
           )
 
-      # Start mouth animation
       self.is_animating = True
       anim_thread = threading.Thread(target=self._animate_mouth_loop)
       anim_thread.daemon = True
       anim_thread.start()
-
       try:
           subprocess.call(cmd, shell=True)
       finally:
-          # Stop mouth animation
           self.is_animating = False
           anim_thread.join(timeout=1.0)
 

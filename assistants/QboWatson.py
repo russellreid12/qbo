@@ -41,33 +41,24 @@ class QBOWatson(object):
        """Bind the hardware controller for mouth sync animations."""
        self.controller = controller
 
-
        self.onListening = False
        self.onListeningChanged = True
        self.finishThread = False
-
-
        self.FORMAT = pyaudio.paInt16
        self.CHANNELS = 1
        self.RATE = 16000
        self.CHUNK = 1024
        self.RECORD_SECONDS = self.config['SpeechToTextListeningTime']
-
-
        # --- Text to Speech ---
        tts_authenticator = IAMAuthenticator(self.config['TextToSpeechAPIKey'])
        self.text_to_speech = TextToSpeechV1(authenticator=tts_authenticator)
        self.text_to_speech.set_service_url(self.config['TextToSpeechURL'])
        self.text_to_speech.set_http_config({'verify': False})
-
-
        # --- Speech to Text ---
        stt_authenticator = IAMAuthenticator(self.config['SpeechToTextAPIKey'])
        self.speech_to_text = SpeechToTextV1(authenticator=stt_authenticator)
        self.speech_to_text.set_service_url(self.config['SpeechToTextURL'])
        self.speech_to_text.set_http_config({'verify': False})
-
-
        # --- Assistant ---
        assistant_authenticator = IAMAuthenticator(self.config['AssistantAPIKey'])
        self.assistant = AssistantV2(
@@ -75,12 +66,8 @@ class QBOWatson(object):
            authenticator=assistant_authenticator)
        self.assistant.set_service_url(self.config['AssistantURL'])
        self.assistant.set_http_config({'verify': False})
-
-
        self.assistantID = self.config['AssistantID']
        self.sessionID = ""
-
-
        self.vc = VisualRecognition()
 
 
@@ -258,15 +245,10 @@ class QBOWatson(object):
            time.sleep(0.15)
        if self.controller:
            self.controller.SetMouth(0)
-
    def SpeechText(self, text):
-
-
        voice = 'en-US_MichaelV3Voice'
        if self.config['language'] == 'spanish':
            voice = 'es-ES_EnriqueV3Voice'
-
-
        try:
            with open('/opt/qbo/sounds/watson.wav', 'wb') as audio_file:
                audio_file.write(
@@ -276,6 +258,14 @@ class QBOWatson(object):
                        voice=voice
                    ).get_result().content
                )
-
-
-
+           self.is_animating = True
+           anim_thread = threading.Thread(target=self._animate_mouth_loop)
+           anim_thread.daemon = True
+           anim_thread.start()
+           try:
+               subprocess_aplay_wav(self.config, "/opt/qbo/sounds/watson.wav")
+           finally:
+               self.is_animating = False
+               anim_thread.join(timeout=1.0)
+       except Exception as e:
+           print("WATSON SPEAK ERROR: %s" % e)

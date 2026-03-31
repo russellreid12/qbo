@@ -245,8 +245,18 @@ Ymax = 550
 Ymin = 420
 
 
-## Initial head position
-Xcoor = 511
+## Initial head position (Y from config; X from headXPosition % or legacy 511)
+def _home_xcoor():
+    hp = config.get("headXPosition")
+    if hp is None:
+        return 511
+    try:
+        return int(Xmin + float(hp) / 100.0 * (Xmax - Xmin))
+    except (TypeError, ValueError):
+        return 511
+
+
+Xcoor = _home_xcoor()
 Ycoor = int(Ymin + float(config["headYPosition"]) / 100 * (Ymax - Ymin))
 print("Calculated initial head position: XCoor " + str(Xcoor) + ", YCoor " + str(Ycoor))
 Facedet = 0
@@ -333,8 +343,7 @@ def stop_voice_recording():
 # 0.4 balances responsiveness with PID-dampened stability.
 # ---------------------------------------------------------------------------
 _smooth_alpha = float(config.get("faceTrackingSmoothAlpha", 0.85))
-_smoothed_cx = 160.0   # initialise to frame centre
-_smoothed_cy = 120.0
+# _smoothed_cx / _smoothed_cy set after target_cx/target_cy (camera section below)
 
 
 # FIX: Tracked servo speed cap — use SetServo (with speed) instead of
@@ -439,12 +448,17 @@ if frame_w <= 0 or frame_h <= 0:
    frame_h = int(webcam.get(cv2.CAP_PROP_FRAME_HEIGHT)) or frame_h
 
 
-# Detection always runs on a 320x240 frame so the tracking centre is always (160, 120).
+# Detection always runs on a 320x240 frame; nominal centre (160, 120).
+# Optional pixel offsets correct lens crop / mounting bias so "centered" matches where the face should sit.
 frame_cx = 160
 frame_cy = 120
+_target_cx_offset = float(config.get("faceTrackingCenterOffsetX", 0) or 0)
+_target_cy_offset = float(config.get("faceTrackingCenterOffsetY", 0) or 0)
+target_cx = frame_cx + _target_cx_offset
+target_cy = frame_cy + _target_cy_offset
 
 
-_face_invert_pan  = True  # FORCED TRUE: proven by coordinate analysis
+_face_invert_pan  = _cfg_bool(config.get("faceTrackingInvertPan"), True)
 _face_invert_tilt = _cfg_bool(config.get("faceTrackingInvertTilt"), False)
 _camera_flip_h    = _cfg_bool(config.get("cameraFlipHorizontal"),   False)
 _face_debug       = _cfg_bool(config.get("faceTrackingDebug"),      False)
@@ -555,17 +569,22 @@ def detect_faces_frame(frame):
     return []
 
 
-print("Camera resolution: {}x{}, detect center: ({},{})".format(frame_w, frame_h, frame_cx, frame_cy))
+print("Camera resolution: {}x{}, track target: ({:.1f},{:.1f}) (frame center + offset)".format(
+    frame_w, frame_h, target_cx, target_cy))
 print("faceDetector={} dnnLoaded={} confidence={}".format(
      _face_detector_type, _dnn_net is not None, _dnn_confidence_min))
 print("PID: Kp={} Ki={} Kd={} integralMax={} deadband={} maxStep={}".format(
      _pid_kp, _pid_ki, _pid_kd, _pid_integral_max, _track_dead, _track_max_step))
-print("faceTrackingInvertPan={} cameraFlipHorizontal={} "
+print("faceTrackingInvertPan={} faceTrackingCenterOffset=({},{}) cameraFlipHorizontal={} "
      "stabilizeSec={} smoothAlpha={} trackServoSpeed={} debug={} debugInterval={}".format(
-     _face_invert_pan, _camera_flip_h,
+     _face_invert_pan, _target_cx_offset, _target_cy_offset, _camera_flip_h,
      _stabilize_sec, _smooth_alpha, _track_servo_speed, _face_debug, _face_debug_interval))
 print("serialTouchProbe={} (set false in config.yml to silence GET_TOUCH if UART is down)".format(
      _serial_touch_probe))
+
+
+_smoothed_cx = float(target_cx)
+_smoothed_cy = float(target_cy)
 
 
 # ---------------------------------------------------------------------------
@@ -730,7 +749,7 @@ def ServoHome():
    global Xcoor, Ycoor, touch_tm, _face_stabilize_until, _smoothed_cx, _smoothed_cy, _last_track_time
 
 
-   Xcoor = 511
+   Xcoor = _home_xcoor()
    Ycoor = int(Ymin + float(config["headYPosition"]) / 100 * (Ymax - Ymin))
    controller.SetServo(1, Xcoor, int(config["servoSpeed"]))
    time.sleep(0.1)
@@ -740,8 +759,8 @@ def ServoHome():
 
 
    # Reset smoother so stale position doesn't yank the head on next detection
-   _smoothed_cx = float(frame_cx)
-   _smoothed_cy = float(frame_cy)
+   _smoothed_cx = float(target_cx)
+   _smoothed_cy = float(target_cy)
 
 
    # Reset PID controllers so stale integral doesn't cause overshoot
@@ -1038,7 +1057,7 @@ while True:
 
            elif time.time() - no_face_tm > 3:
                ServoHome()
-               Cface[0] = [0, 0]
+               Cface = [0, 0]
                no_face_tm = time.time()
 
 
@@ -1066,10 +1085,10 @@ while True:
 
 
        # ---- Compute face offsets for state machine & servo tracking ----
-       faceOffset_X = float(frame_cx) - Cface[0]
+       faceOffset_X = float(target_cx) - Cface[0]
        if _face_invert_pan:
            faceOffset_X = -faceOffset_X
-       faceOffset_Y = Cface[1] - float(frame_cy)
+       faceOffset_Y = Cface[1] - float(target_cy)
        if _face_invert_tilt:
            faceOffset_Y = -faceOffset_Y
        face_is_centered = (abs(faceOffset_X) <= _track_dead and abs(faceOffset_Y) <= _track_dead)

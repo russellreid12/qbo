@@ -19,8 +19,18 @@ startWith: interactive-dialogflow
 volume: 100
 microphoneGain: 100
 camera: 0
+# Head rest pose: headYPosition 0–100 maps tilt (Y); headXPosition 0–100 maps pan (X). Omit headXPosition for legacy default (511).
+# If the head starts too far to the robot’s right, lower headXPosition (e.g. 45–48). Too far left: raise toward 55–60.
 headYPosition: 39
+# headXPosition: 48
 servoSpeed: 100
+
+# Face tracking (PiFaceFast): invert pan/tilt if the head turns the wrong way; center offsets (pixels) fix steady left/right/up/down bias vs the camera.
+# faceTrackingInvertPan: true
+# faceTrackingInvertTilt: false
+# faceTrackingCenterOffsetX: 0   # positive = aim slightly left in frame (nudges pan if image center is biased)
+# faceTrackingCenterOffsetY: 0
+# cameraFlipHorizontal: false
 SpeechToTextListeningTime: 5
 serialPort: /dev/serial0
 

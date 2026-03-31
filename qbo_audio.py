@@ -2,6 +2,9 @@
 
 import shlex
 import subprocess
+import time
+
+_AUDIO_READY = False
 
 # When config.yml omits audio keys, match typical /etc/asound.conf (playback → convertQBO).
 DEFAULT_AUDIO_PLAYBACK_MODE = "convertQBO"
@@ -93,13 +96,30 @@ def aplay_wav_shell_play_wav(config, wav_path: str) -> str:
         # Only the last attempt keeps stderr (easier debugging if everything fails).
         redir = " 2>/dev/null" if i + 1 < len(devs) else ""
         parts.append("aplay -q -D {} {}{}".format(shlex.quote(d), wav_q, redir))
-    if len(parts) == 1:
-        return parts[0]
-    return "(" + " || ".join(parts) + ")"
+    
+    res = "(" + " || ".join(parts) + ")" if len(parts) > 1 else parts[0]
+    
+    # Optional one-time delay for Bluetooth sinks at boot
+    global _AUDIO_READY
+    delay = config.get("audioBootDelay", 0)
+    if not _AUDIO_READY and delay:
+        _AUDIO_READY = True
+        return "sleep {} && {}".format(delay, res)
+        
+    return res
 
 
 def subprocess_aplay_wav(config, path: str, quiet: bool = True) -> int:
     """Try each PCM from aplay_wav_devices_to_try; return 0 if any aplay succeeds."""
+    global _AUDIO_READY
+    delay = config.get("audioBootDelay", 0)
+    if not _AUDIO_READY and delay:
+        _AUDIO_READY = True
+        try:
+            time.sleep(float(delay))
+        except (TypeError, ValueError):
+            pass
+
     prefix = ["aplay"] + (["-q"] if quiet else []) + ["-D"]
     devs = aplay_wav_devices_to_try(config)
     for i, dev in enumerate(devs):

@@ -49,7 +49,7 @@ dialogflowv2_projectid: ''
 # -----------------------------------------------------------------------------
 
 # ----- PROFILE: ROBOT (onboard MAX98357 / Voice HAT) -----
-audioPlaybackMode: plughw
+#audioPlaybackMode: plughw
 # Session audio (pulse / default / sysdefault / *pipewire*): auto-fallback tries onboard PCMs if the
 # socket is not up yet. Failed tries hide ALSA stderr so logs stay quiet when fallback works.
 # Set audioPlaybackAutoFallback: false to disable, or set audioPlaybackFallbackDevice: plughw:0,0
@@ -60,10 +60,10 @@ audioPlaybackMode: plughw
 # audioPlaybackDevice: plughw:0,0
 
 # Mic: index of "dmicQBO_sv" from PortAudio list (often 11; verify on your Pi).
-microphoneDeviceIndex: 11
-microphoneAlsaDevice: dmicQBO_sv
-microphoneSampleRate: 16000
-microphoneAlsaSampleRate: 16000
+# microphoneDeviceIndex: 11
+# microphoneAlsaDevice: dmicQBO_sv
+# microphoneSampleRate: 16000
+# microphoneAlsaSampleRate: 16000
 
 # ----- PROFILE: AIRPODS (PipeWire pulse; comment all ROBOT keys above first) -----
 # When switching to AirPods, comment out these five keys from ROBOT:
@@ -71,11 +71,12 @@ microphoneAlsaSampleRate: 16000
 #   microphoneSampleRate, microphoneAlsaSampleRate
 # Then uncomment the five lines below:
 #
-#audioPlaybackDevice: pulse
-#microphoneDeviceIndex: 5
-#microphoneAlsaDevice: pulse
-#microphoneSampleRate: 16000
-#microphoneAlsaSampleRate: 16000
+audioBootDelay: 10
+audioPlaybackDevice: pulse
+microphoneDeviceIndex: 5
+microphoneAlsaDevice: pulse
+microphoneSampleRate: 16000
+microphoneAlsaSampleRate: 16000
 # If capture fails on HFP CVSD, try 8000 for both sample rates instead of 16000.
 
 # -----------------------------------------------------------------------------

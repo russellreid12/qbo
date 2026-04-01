@@ -15,26 +15,31 @@ _aplay_play = aplay_wav_shell_play_wav(config, _PICO_WAV)
 
 
 def _enable_qbo_speaker_before_tts(cfg):
-	"""Head MCU keeps the amp muted until this runs; PiFaceFast does it later, but boot TTS uses Start.py first."""
-	try:
-		import serial
-		from controller.QboController import Controller
-		port = cfg.get("serialPort", "/dev/serial0")
-		ser = serial.Serial(
-			port,
-			baudrate=115200,
-			bytesize=serial.EIGHTBITS,
-			stopbits=serial.STOPBITS_ONE,
-			parity=serial.PARITY_NONE,
-			rtscts=False,
-			dsrdtr=False,
-			timeout=0.1,
-		)
-		ctrl = Controller(ser)
-		ctrl.SetEnableSpeaker(True)
-		ser.close()
-	except Exception as e:
-		print("Start.py: could not enable QBO speaker over serial:", e)
+	"""Head MCU keeps the amp muted until this runs; try multiple times during boot-up scramble."""
+	for attempt in range(3):
+		try:
+			import serial
+			from controller.QboController import Controller
+			port = cfg.get("serialPort", "/dev/serial0")
+			ser = serial.Serial(
+				port,
+				baudrate=115200,
+				bytesize=serial.EIGHTBITS,
+				stopbits=serial.STOPBITS_ONE,
+				parity=serial.PARITY_NONE,
+				rtscts=False,
+				dsrdtr=False,
+				timeout=0.1,
+			)
+			ctrl = Controller(ser)
+			ctrl.SetEnableSpeaker(True)
+			ser.close()
+			print(f"Start.py: Speaker enabled on attempt {attempt + 1}")
+			return True
+		except Exception as e:
+			print(f"Start.py: Speaker enable attempt {attempt + 1} failed: {e}")
+			time.sleep(2)
+	return False
 
 
 _enable_qbo_speaker_before_tts(config)

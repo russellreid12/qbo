@@ -1,5 +1,6 @@
 """Central ALSA playback device for QBO (HiFiBerry / convertQBO, Voice HAT / plughw, etc.)."""
 
+import os
 import shlex
 import subprocess
 import time

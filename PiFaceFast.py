@@ -135,10 +135,13 @@ if config["distro"] == "ibmwatson":
    interactiveTypeGAssistant = False
 
 
-   Speak.SpeechText_2(
-       "Loading the IBM Watson system. Wait until I tell you that I'm ready.",
-       "Cargando el sistema IBM Watson. Espera hasta que te diga que estoy listo.", True)
-   time.sleep(10)
+   # Mirror Start.py style for maximum clarity (bypass software mouth thread)
+   _txt = "Cargando el sistema IBM Watson. Espera hasta que te diga que estoy listo." if config["language"] == "spanish" else "Loading the IBM Watson system. Wait until I tell you that I'm ready."
+   _lang = "es-ES" if config["language"] == "spanish" else "en-US"
+   _cmd = 'pico2wave -l "{l}" -w /opt/qbo/sounds/pico2wave.wav "<volume level=\'{v}\'>{t}" && {a}'.format(
+       l=_lang, v=config["volume"], t=_txt, a=aplay_wav_shell_play_wav(config, "/opt/qbo/sounds/pico2wave.wav")
+   )
+   subprocess.call(_cmd, shell=True)
    talk.startThread()
    time.sleep(1)
 

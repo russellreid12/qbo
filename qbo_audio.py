@@ -85,45 +85,57 @@ def aplay_wav_device_quoted(config):
 
 def wait_for_audio_ready(config):
     """
-    Perform a one-time sleep (boot delay) if not yet ready.
-    This can be called from Python BEFORE starting mouth animation to keep them in sync.
+    Perform a one-time system-wide sleep (boot delay) if not yet ready.
+    Uses a temporary file in /tmp/ to coordinate across different processes
+    (e.g., Start.py and PiFaceFast.py).
     """
     global _AUDIO_READY
     if _AUDIO_READY:
         return
     
+    flag_path = "/tmp/qbo_audio.ready"
+    if os.path.exists(flag_path):
+        _AUDIO_READY = True
+        return
+
     delay = config.get("audioBootDelay", 0)
     if delay:
         try:
             time.sleep(float(delay))
         except (TypeError, ValueError):
             pass
+    
+    # Mark as ready for all future processes this boot
+    try:
+        with open(flag_path, "w") as f:
+            f.write("ready")
+    except Exception:
+        pass
     _AUDIO_READY = True
 
 
 def aplay_wav_shell_play_wav(config, wav_path: str) -> str:
     """
     Shell fragment: play wav with aplay, trying each PCM until one succeeds.
-    Stderr from failed tries is discarded so ALSA pulse.c noise does not fill logs
-    when onboard audio succeeds next.
     """
     wav_q = shlex.quote(wav_path)
     devs = aplay_wav_devices_to_try(config)
     parts = []
     for i, d in enumerate(devs):
-        # Only the last attempt keeps stderr (easier debugging if everything fails).
         redir = " 2>/dev/null" if i + 1 < len(devs) else ""
         parts.append("aplay -q -D {} {}{}".format(shlex.quote(d), wav_q, redir))
     
     res = "(" + " || ".join(parts) + ")" if len(parts) > 1 else parts[0]
     
-    # Optional one-time delay for Bluetooth sinks at boot
+    # Optional cross-process delay for Bluetooth sinks at boot
     global _AUDIO_READY
-    if not _AUDIO_READY:
+    flag_path = "/tmp/qbo_audio.ready"
+    if not _AUDIO_READY and not os.path.exists(flag_path):
         delay = config.get("audioBootDelay", 0)
         if delay:
             _AUDIO_READY = True
-            return "sleep {} && {}".format(delay, res)
+            # The shell command will both wait and create the flag for others
+            return "sleep {} && touch {} && {}".format(delay, flag_path, res)
         
     return res
 

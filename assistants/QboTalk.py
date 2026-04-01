@@ -279,9 +279,13 @@ class QBOtalk(object):
     
     # Pre-clean text to avoid shell/SSML issues
     clean_text = str(text).replace('"', '').replace("'", "")
-    pico_text = f"<volume level='{vol}'>{clean_text}"
     
-    gen = f'pico2wave -l {shlex.quote(lang)} -w {shlex.quote(wav)} {shlex.quote(pico_text)}'
+    # Use double quotes for the SSML block, matching the working Start.py style.
+    gen = (
+      f'pico2wave -l {shlex.quote(lang)} '
+      f'-w {shlex.quote(wav)} '
+      f'"<volume level=\'{vol}\'>{clean_text}"'
+    )
     
     hw = self.config.get("audioPlaybackHwDevice") or self.config.get("audioPlaybackDevice") or "default"
     try:

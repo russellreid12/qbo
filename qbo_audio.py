@@ -160,47 +160,6 @@ def aplay_stdin_shell_play_chain(config) -> str:
     return "(" + " || ".join(parts) + ")"
 
 
-def enable_qbo_speaker_robust(cfg, max_retries=10, retry_delay=2):
-	"""
-	Head MCU keeps the amp muted until this runs; PiFaceFast does it later,
-	but boot TTS uses Start.py first. Uses a retry loop to wait for the port.
-	"""
-	port = cfg.get("serialPort", "/dev/serial0")
-	print(f"qbo_audio: attempting to enable speaker on {port} (retries={max_retries})...")
-	
-	for i in range(max_retries):
-		try:
-			import serial
-			from controller.QboController import Controller
-			
-			if not os.path.exists(port):
-				print(f"qbo_audio: {port} not found yet, waiting...")
-				time.sleep(retry_delay)
-				continue
-
-			ser = serial.Serial(
-				port,
-				baudrate=115200,
-				bytesize=serial.EIGHTBITS,
-				stopbits=serial.STOPBITS_ONE,
-				parity=serial.PARITY_NONE,
-				rtscts=False,
-				dsrdtr=False,
-				timeout=0.2,
-			)
-			ctrl = Controller(ser)
-			ctrl.SetEnableSpeaker(True)
-			ser.close()
-			print("qbo_audio: QBO speaker enabled successfully.")
-			return True
-		except Exception as e:
-			print(f"qbo_audio: speaker enable attempt {i+1} failed: {e}")
-			time.sleep(retry_delay)
-	
-	print("qbo_audio: WARNING: could not enable speaker after multiple retries.")
-	return False
-
-
 def wait_for_audio_hardware_visible(max_retries=10, retry_delay=2):
 	"""Wait for at least one ALSA soundcard to be visible in 'aplay -l'."""
 	print("qbo_audio: checking for audio hardware...")

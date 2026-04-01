@@ -378,11 +378,22 @@ _track_servo_speed = int(config.get("faceTrackingServoSpeed", 100))
 if talk and hasattr(talk, "set_controller"):
     talk.set_controller(controller)
 
-# vc = VisualRecognition() - Moved just after controller init if needed, or kept here.
-vc = VisualRecognition()
+# vc = VisualRecognition()
 
-# Robust speaker initialization (retry loop if port is busy)
-enable_qbo_speaker_robust(config)
+# Robust speaker initialization (retry loop using existing controller)
+def _retry_enable_speaker(ctrl, max_retries=5, delay=2):
+    print("PiFaceFast: ensuring speaker is enabled...")
+    for i in range(max_retries):
+        try:
+            ctrl.SetEnableSpeaker(True)
+            print("PiFaceFast: speaker enabled successfully.")
+            return True
+        except Exception as e:
+            print(f"PiFaceFast: speaker enable attempt {i+1} failed: {e}")
+            time.sleep(delay)
+    return False
+
+_retry_enable_speaker(controller)
 wait_for_audio_hardware_visible()
 
 try:

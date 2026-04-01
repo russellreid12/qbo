@@ -154,14 +154,14 @@ def _speak_pico2wave(text: str, lang_code: str) -> None:
    wait_for_audio_ready(config)
 
    _wav = "/opt/qbo/sounds/pico2wave.wav"
-   # Wrap in <volume> if set, otherwise plain text. Use shlex.quote for the whole SSML block.
    vol = config.get("volume", 100)
-   pico_text = f"<volume level='{vol}'>{clean}"
    
+   # Use double quotes for the SSML block, matching the working Start.py style.
+   # We still use shlex.quote for the file path to be safe.
    cmd = (
       f"pico2wave -l {shlex.quote(lang_code)} "
       f"-w {shlex.quote(_wav)} "
-      f"{shlex.quote(pico_text)} "
+      f"\"<volume level='{vol}'>{clean}\" "
       f"&& {aplay_wav_shell_play_wav(config, _wav)}"
    )
 

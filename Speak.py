@@ -151,6 +151,9 @@ def _speak_pico2wave(text: str, lang_code: str) -> None:
    clean = _clean_text(text)
    # Escape single quotes for the shell command
    clean = clean.replace("'", "'\\''")
+   # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
+   wait_for_audio_ready(config)
+
    _wav = "/opt/qbo/sounds/pico2wave.wav"
    cmd = (
       f"pico2wave -l \"{lang_code}\" "
@@ -158,8 +161,6 @@ def _speak_pico2wave(text: str, lang_code: str) -> None:
       f"\"<volume level='{config['volume']}'>{clean}\" "
       f"&& {aplay_wav_shell_play_wav(config, _wav)}"
    )
-   # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
-   wait_for_audio_ready(config)
 
    global is_animating
    is_animating = True

@@ -160,15 +160,15 @@ class QboDialogFlowV2(object):
 
 	def SpeechText(self, text_to_speech):
 
+		# Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
+		wait_for_audio_ready(self.config)
+
 		_wav = "/opt/qbo/sounds/pico2wave.wav"
 		_play = aplay_wav_shell_play_wav(self.config, _wav)
 		if self.config["language"] == "spanish":
 			speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play
 		else:
 			speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play
-
-		# Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
-		wait_for_audio_ready(self.config)
 
 		# Start mouth animation
 		self.is_animating = True

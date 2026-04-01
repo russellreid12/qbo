@@ -17,7 +17,7 @@ import Speak
 import _thread
 import threading
 import yaml
-from qbo_audio import subprocess_aplay_wav, enable_qbo_speaker_robust, wait_for_audio_hardware_visible
+from qbo_audio import subprocess_aplay_wav, wait_for_audio_hardware_visible
 from assistants.QboTalk import QBOtalk
 from assistants.QboTalkMycroft import QBOtalkMycroft
 from controller.QboController import Controller

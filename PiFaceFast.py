@@ -87,6 +87,29 @@ _serial_touch_probe = _cfg_bool(config.get("serialTouchProbe"), True)
 
 
 
+# ---------------------------------------------------------------------------
+# Hardware Initialization: Serial port and Mouth Controller
+# (Moved to the beginning so the mouth is accessible for early startup speech)
+# ---------------------------------------------------------------------------
+if len(sys.argv) > 1:
+   port = sys.argv[1]
+else:
+   port = config.get("serialPort", "/dev/serial0")
+
+try:
+   ser = serial.Serial(port, baudrate=115200, bytesize=serial.EIGHTBITS,
+                       stopbits=serial.STOPBITS_ONE, parity=serial.PARITY_NONE,
+                       rtscts=False, dsrdtr=False, timeout=0.1)
+   print("Open serial port successfully: " + str(ser.name))
+except Exception:
+   print("Error opening serial port.")
+   sys.exit()
+
+controller = Controller(ser)
+Speak.set_controller(controller)
+# (Note: talk.set_controller will be called after assistants are initialized below)
+
+
 if config["distro"] == "ibmwatson":
    print("Mode: IBM Watson")
 
@@ -352,28 +375,10 @@ _smooth_alpha = float(config.get("faceTrackingSmoothAlpha", 0.85))
 _track_servo_speed = int(config.get("faceTrackingServoSpeed", 100))
 
 
-if len(sys.argv) > 1:
-   port = sys.argv[1]
-else:
-   port = config.get("serialPort", "/dev/serial0")
-
-
-try:
-   ser = serial.Serial(port, baudrate=115200, bytesize=serial.EIGHTBITS,
-                       stopbits=serial.STOPBITS_ONE, parity=serial.PARITY_NONE,
-                       rtscts=False, dsrdtr=False, timeout=0.1)
-   print("Open serial port successfully: " + str(ser.name))
-except Exception:
-   print("Error opening serial port.")
-   sys.exit()
-
-
-controller = Controller(ser)
-
 if talk and hasattr(talk, "set_controller"):
     talk.set_controller(controller)
 
-Speak.set_controller(controller)
+# vc = VisualRecognition() - Moved just after controller init if needed, or kept here.
 vc = VisualRecognition()
 
 try:

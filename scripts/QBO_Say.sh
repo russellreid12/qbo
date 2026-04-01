@@ -19,8 +19,7 @@ if [[ $1 = $START ]]; then
 		echo "Say.py is already running"
 	else
 		echo "launching Say.py"
-		export XDG_RUNTIME_DIR=/run/user/1000
-		export PULSE_SERVER=unix:/run/user/1000/pulse/native
+		export XDG_RUNTIME_DIR=/run/user/$(id -u)
 		/opt/qbo/Say.py > /dev/null &
 	fi
 fi

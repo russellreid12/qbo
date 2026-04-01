@@ -19,8 +19,7 @@ if [[ $1 = $START ]]; then
 		echo "PiFaceFast.py is already running"
 	else
 		echo "launching PiFaceFast"
-		export XDG_RUNTIME_DIR=/run/user/1000
-		export PULSE_SERVER=unix:/run/user/1000/pulse/native
+		export XDG_RUNTIME_DIR=/run/user/$(id -u)
 		PYTHONHTTPSVERIFY=0
 		# Cron runs as user qbo with bare python3 — use a venv if present (same deps as dev).
 		if [ -x /opt/qbo/qbo_venv/bin/python3 ]; then

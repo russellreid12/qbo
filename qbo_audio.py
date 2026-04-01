@@ -126,19 +126,7 @@ def aplay_wav_shell_play_wav(config, wav_path: str) -> str:
         redir = " 2>/dev/null" if i + 1 < len(devs) else ""
         parts.append("aplay -q -D {} {}{}".format(shlex.quote(d), wav_q, redir))
     
-    res = "(" + " || ".join(parts) + ")" if len(parts) > 1 else parts[0]
-    
-    # Optional cross-process delay for Bluetooth sinks at boot
-    global _AUDIO_READY
-    flag_path = "/tmp/qbo_audio.ready"
-    if not _AUDIO_READY and not os.path.exists(flag_path):
-        delay = config.get("audioBootDelay", 0)
-        if delay:
-            _AUDIO_READY = True
-            # The shell command will both wait and create the flag for others
-            return "sleep {} && touch {} && {}".format(delay, flag_path, res)
-        
-    return res
+    return "(" + " || ".join(parts) + ")" if len(parts) > 1 else parts[0]
 
 
 def subprocess_aplay_wav(config, path: str, quiet: bool = True) -> int:

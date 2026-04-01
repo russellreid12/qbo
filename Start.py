@@ -4,12 +4,13 @@ import time
 import yaml
 import subprocess
 
-from qbo_audio import aplay_wav_shell_play_wav
+from qbo_audio import aplay_wav_shell_play_wav, wait_for_audio_ready
 
 time.sleep(5)
 
 # read config file
 config = yaml.safe_load(open("/opt/qbo/config.yml"))
+wait_for_audio_ready(config)  # Perform the boot delay (e.g. 10s wait for AirPods) exactly once here
 _PICO_WAV = "/opt/qbo/sounds/pico2wave.wav"
 _aplay_play = aplay_wav_shell_play_wav(config, _PICO_WAV)
 

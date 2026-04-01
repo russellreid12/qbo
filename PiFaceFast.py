@@ -134,6 +134,8 @@ if config["distro"] == "ibmwatson":
    # talk.set_controller(controller) will be called after controller is defined below
    interactiveTypeGAssistant = False
 
+   # Wait for audio once (synchronizes with Start.py via a system-wide flag)
+   wait_for_audio_ready(config)
 
    # Mirror Start.py style for maximum clarity (bypass software mouth thread)
    _txt = "Cargando el sistema IBM Watson. Espera hasta que te diga que estoy listo." if config["language"] == "spanish" else "Loading the IBM Watson system. Wait until I tell you that I'm ready."

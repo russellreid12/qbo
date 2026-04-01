@@ -17,7 +17,7 @@ import Speak
 import _thread
 import threading
 import yaml
-from qbo_audio import subprocess_aplay_wav
+from qbo_audio import subprocess_aplay_wav, enable_qbo_speaker_robust, wait_for_audio_hardware_visible
 from assistants.QboTalk import QBOtalk
 from assistants.QboTalkMycroft import QBOtalkMycroft
 from controller.QboController import Controller
@@ -381,10 +381,9 @@ if talk and hasattr(talk, "set_controller"):
 # vc = VisualRecognition() - Moved just after controller init if needed, or kept here.
 vc = VisualRecognition()
 
-try:
-   controller.SetEnableSpeaker(True)
-except Exception as e:
-   print("SetEnableSpeaker: %s" % e)
+# Robust speaker initialization (retry loop if port is busy)
+enable_qbo_speaker_robust(config)
+wait_for_audio_hardware_visible()
 
 try:
    controller.SetTouchAutoOff(0, 0, 0)

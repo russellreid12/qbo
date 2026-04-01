@@ -6,7 +6,7 @@ import subprocess
 import sys
 import os
 
-from qbo_audio import aplay_wav_shell_play_wav
+from qbo_audio import aplay_wav_shell_play_wav, enable_qbo_speaker_robust, wait_for_audio_hardware_visible
 
 # Ensure logs directory exists (though installer should have created it)
 LOG_FILE = "/opt/qbo/logs/Start.log"
@@ -27,68 +27,8 @@ _PICO_WAV = "/opt/qbo/sounds/pico2wave.wav"
 _aplay_play = aplay_wav_shell_play_wav(config, _PICO_WAV)
 
 
-def _enable_qbo_speaker_before_tts(cfg):
-	"""Head MCU keeps the amp muted until this runs; PiFaceFast does it later, but boot TTS uses Start.py first."""
-	port = cfg.get("serialPort", "/dev/serial0")
-	max_retries = 10
-	retry_delay = 2
-
-	print(f"Start.py: attempting to enable speaker on {port} (retries={max_retries})...")
-	
-	for i in range(max_retries):
-		try:
-			import serial
-			from controller.QboController import Controller
-			
-			if not os.path.exists(port):
-				print(f"Start.py: {port} not found yet, waiting...")
-				time.sleep(retry_delay)
-				continue
-
-			ser = serial.Serial(
-				port,
-				baudrate=115200,
-				bytesize=serial.EIGHTBITS,
-				stopbits=serial.STOPBITS_ONE,
-				parity=serial.PARITY_NONE,
-				rtscts=False,
-				dsrdtr=False,
-				timeout=0.2,
-			)
-			ctrl = Controller(ser)
-			ctrl.SetEnableSpeaker(True)
-			ser.close()
-			print("Start.py: QBO speaker enabled successfully.")
-			return True
-		except Exception as e:
-			print(f"Start.py: attempt {i+1} failed: {e}")
-			time.sleep(retry_delay)
-	
-	print("Start.py: WARNING: could not enable speaker after multiple retries.")
-	return False
-
-
-def _wait_for_audio_hardware():
-	"""Wait for at least one ALSA soundcard to be visible."""
-	max_retries = 10
-	retry_delay = 2
-	print("Start.py: checking for audio hardware...")
-	for i in range(max_retries):
-		try:
-			# Check if 'aplay -l' shows any cards
-			res = subprocess.run(["aplay", "-l"], capture_output=True, text=True)
-			if "card" in res.stdout.lower():
-				print("Start.py: audio hardware detected.")
-				return True
-		except Exception:
-			pass
-		print(f"Start.py: no audio hardware found yet (attempt {i+1}), waiting...")
-		time.sleep(retry_delay)
-	return False
-
-
-_enable_qbo_speaker_before_tts(config)
-_wait_for_audio_hardware()
+enable_qbo_speaker_robust(config)
+wait_for_audio_hardware_visible()
 
 if config["language"] == "spanish":
 	text = "Hola. Soy Cubo."

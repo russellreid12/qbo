@@ -3,6 +3,8 @@
 import shlex
 import subprocess
 import time
+import sys
+import os
 
 _AUDIO_READY = False
 
@@ -156,3 +158,61 @@ def aplay_stdin_shell_play_chain(config) -> str:
     if len(parts) == 1:
         return parts[0]
     return "(" + " || ".join(parts) + ")"
+
+
+def enable_qbo_speaker_robust(cfg, max_retries=10, retry_delay=2):
+	"""
+	Head MCU keeps the amp muted until this runs; PiFaceFast does it later,
+	but boot TTS uses Start.py first. Uses a retry loop to wait for the port.
+	"""
+	port = cfg.get("serialPort", "/dev/serial0")
+	print(f"qbo_audio: attempting to enable speaker on {port} (retries={max_retries})...")
+	
+	for i in range(max_retries):
+		try:
+			import serial
+			from controller.QboController import Controller
+			
+			if not os.path.exists(port):
+				print(f"qbo_audio: {port} not found yet, waiting...")
+				time.sleep(retry_delay)
+				continue
+
+			ser = serial.Serial(
+				port,
+				baudrate=115200,
+				bytesize=serial.EIGHTBITS,
+				stopbits=serial.STOPBITS_ONE,
+				parity=serial.PARITY_NONE,
+				rtscts=False,
+				dsrdtr=False,
+				timeout=0.2,
+			)
+			ctrl = Controller(ser)
+			ctrl.SetEnableSpeaker(True)
+			ser.close()
+			print("qbo_audio: QBO speaker enabled successfully.")
+			return True
+		except Exception as e:
+			print(f"qbo_audio: speaker enable attempt {i+1} failed: {e}")
+			time.sleep(retry_delay)
+	
+	print("qbo_audio: WARNING: could not enable speaker after multiple retries.")
+	return False
+
+
+def wait_for_audio_hardware_visible(max_retries=10, retry_delay=2):
+	"""Wait for at least one ALSA soundcard to be visible in 'aplay -l'."""
+	print("qbo_audio: checking for audio hardware...")
+	for i in range(max_retries):
+		try:
+			# Check if 'aplay -l' shows any cards
+			res = subprocess.run(["aplay", "-l"], capture_output=True, text=True)
+			if "card" in res.stdout.lower():
+				print("qbo_audio: audio hardware detected.")
+				return True
+		except Exception:
+			pass
+		print(f"qbo_audio: no audio hardware found yet (attempt {i+1}), waiting...")
+		time.sleep(retry_delay)
+	return False

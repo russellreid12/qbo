@@ -269,15 +269,20 @@ class QBOtalk(object):
       self.controller.SetMouth(0)
 
   def _play_pico2wave(self, text, lang):
+    import shlex
     # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
     wait_for_audio_ready(self.config)
 
-    vol = self.config["volume"]
+    vol = self.config.get("volume", 100)
     wav = "/opt/qbo/sounds/pico2wave.wav"
     mode = str(self.config.get("audioPlaybackMode", "plughw")).lower()
-    gen = (
-      'pico2wave -l "{lang}" -w {wav} "<volume level=\'{vol}\'>{text}"'
-    ).format(lang=lang, wav=wav, vol=vol, text=text)
+    
+    # Pre-clean text to avoid shell/SSML issues
+    clean_text = str(text).replace('"', '').replace("'", "")
+    pico_text = f"<volume level='{vol}'>{clean_text}"
+    
+    gen = f'pico2wave -l {shlex.quote(lang)} -w {shlex.quote(wav)} {shlex.quote(pico_text)}'
+    
     hw = self.config.get("audioPlaybackHwDevice") or self.config.get("audioPlaybackDevice") or "default"
     try:
       gain_db = float(self.config.get("audioPlaybackGainDb", 0))
@@ -289,13 +294,13 @@ class QBOtalk(object):
       cmd = (
         "{gen} && sox {wav} -t raw -e signed-integer -b 32 -c 2 - rate -v 48000{gain} "
         "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
-      ).format(gen=gen, wav=wav, hw=shlex.quote(str(hw)), gain=gain_sox)
+      ).format(gen=gen, wav=shlex.quote(wav), hw=shlex.quote(str(hw)), gain=gain_sox)
     elif mode == "raw48":
       g0 = ("gain {:.1f} ".format(gain_db) if gain_db != 0 else "")
       cmd = (
         "{gen} && sox {wav} {g0}-t raw -r 48000 -e signed-integer -b 32 -c 2 - "
         "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
-      ).format(gen=gen, wav=wav, hw=shlex.quote(str(hw)), g0=g0)
+      ).format(gen=gen, wav=shlex.quote(wav), hw=shlex.quote(str(hw)), g0=g0)
     else:
       cmd = "{gen} && {aplay}".format(
         gen=gen, aplay=aplay_wav_shell_play_wav(self.config, wav)

@@ -148,17 +148,20 @@ def _speak_pico2wave(text: str, lang_code: str) -> None:
    Fallback: synthesize with pico2wave (offline, no internet needed).
    pico2wave has limited SSML support — pass plain text only.
    """
+   import shlex
    clean = _clean_text(text)
-   # Escape single quotes for the shell command
-   clean = clean.replace("'", "'\\''")
    # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
    wait_for_audio_ready(config)
 
    _wav = "/opt/qbo/sounds/pico2wave.wav"
+   # Wrap in <volume> if set, otherwise plain text. Use shlex.quote for the whole SSML block.
+   vol = config.get("volume", 100)
+   pico_text = f"<volume level='{vol}'>{clean}"
+   
    cmd = (
-      f"pico2wave -l \"{lang_code}\" "
-      f"-w {_wav} "
-      f"\"<volume level='{config['volume']}'>{clean}\" "
+      f"pico2wave -l {shlex.quote(lang_code)} "
+      f"-w {shlex.quote(_wav)} "
+      f"{shlex.quote(pico_text)} "
       f"&& {aplay_wav_shell_play_wav(config, _wav)}"
    )
 

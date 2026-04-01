@@ -83,6 +83,24 @@ def aplay_wav_device_quoted(config):
     return shlex.quote(aplay_wav_device(config))
 
 
+def wait_for_audio_ready(config):
+    """
+    Perform a one-time sleep (boot delay) if not yet ready.
+    This can be called from Python BEFORE starting mouth animation to keep them in sync.
+    """
+    global _AUDIO_READY
+    if _AUDIO_READY:
+        return
+    
+    delay = config.get("audioBootDelay", 0)
+    if delay:
+        try:
+            time.sleep(float(delay))
+        except (TypeError, ValueError):
+            pass
+    _AUDIO_READY = True
+
+
 def aplay_wav_shell_play_wav(config, wav_path: str) -> str:
     """
     Shell fragment: play wav with aplay, trying each PCM until one succeeds.
@@ -99,67 +117,32 @@ def aplay_wav_shell_play_wav(config, wav_path: str) -> str:
     
     res = "(" + " || ".join(parts) + ")" if len(parts) > 1 else parts[0]
     
-    # Optional one-time delay + retry loop for Bluetooth sinks at boot
+    # Optional one-time delay for Bluetooth sinks at boot
     global _AUDIO_READY
-    delay = config.get("audioBootDelay", 0)
-    if not _AUDIO_READY and delay:
-        _AUDIO_READY = True
-        
-        # If using pulse/default, try it 3 times before falling back to physical cards
-        primary = devs[0]
-        if _primary_uses_session_audio(primary):
-            p_q = shlex.quote(primary)
-            retry_parts = []
-            for _ in range(3):
-                retry_parts.append("aplay -q -D {} {}".format(p_q, wav_q))
-            
-            # The fallback chain starts from the second device (if any)
-            fallback_res = ""
-            if len(devs) > 1:
-                f_parts = []
-                for j, d in enumerate(devs[1:]):
-                    redir = " 2>/dev/null" if (j + 2 < len(devs)) else ""
-                    f_parts.append("aplay -q -D {} {}{}".format(shlex.quote(d), wav_q, redir))
-                fallback_res = "(" + " || ".join(f_parts) + ")" if len(f_parts) > 1 else f_parts[0]
-            
-            if fallback_res:
-                res = "({} || sleep 1 && {} || sleep 1 && {} || {})".format(retry_parts[0], retry_parts[1], retry_parts[2], fallback_res)
-            else:
-                res = "({} || sleep 1 && {} || sleep 1 && {})".format(retry_parts[0], retry_parts[1], retry_parts[2])
-        
-        return "sleep {} && {}".format(delay, res)
+    if not _AUDIO_READY:
+        delay = config.get("audioBootDelay", 0)
+        if delay:
+            _AUDIO_READY = True
+            return "sleep {} && {}".format(delay, res)
         
     return res
 
 
 def subprocess_aplay_wav(config, path: str, quiet: bool = True) -> int:
     """Try each PCM from aplay_wav_devices_to_try; return 0 if any aplay succeeds."""
-    global _AUDIO_READY
-    delay = config.get("audioBootDelay", 0)
-    if not _AUDIO_READY and delay:
-        _AUDIO_READY = True
-        try:
-            time.sleep(float(delay))
-        except (TypeError, ValueError):
-            pass
+    wait_for_audio_ready(config)
 
     prefix = ["aplay"] + (["-q"] if quiet else []) + ["-D"]
     devs = aplay_wav_devices_to_try(config)
+    prefix = ["aplay"] + (["-q"] if quiet else []) + ["-D"]
+    devs = aplay_wav_devices_to_try(config)
     for i, dev in enumerate(devs):
-        # Retry primary device 3 times if it uses session audio (common for BT at boot)
-        retries = 3 if (i == 0 and _primary_uses_session_audio(dev)) else 1
-        
-        for attempt in range(retries):
-            if attempt > 0:
-                time.sleep(1)
-            
-            kwargs = {}
-            if i + 1 < len(devs) or attempt + 1 < retries:
-                kwargs["stderr"] = subprocess.DEVNULL
-                
-            r = subprocess.call(prefix + [dev, path], **kwargs)
-            if r == 0:
-                return 0
+        kwargs = {}
+        if i + 1 < len(devs):
+            kwargs["stderr"] = subprocess.DEVNULL
+        r = subprocess.call(prefix + [dev, path], **kwargs)
+        if r == 0:
+            return 0
     return 1
 
 

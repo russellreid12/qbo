@@ -12,7 +12,7 @@ import threading
 import time
 import random
 
-from qbo_audio import aplay_wav_shell_play_wav, subprocess_aplay_wav
+from qbo_audio import aplay_wav_shell_play_wav, subprocess_aplay_wav, wait_for_audio_ready
 
 
 
@@ -122,6 +122,9 @@ def _try_watson_tts(text: str, voice: str) -> bool:
       with open('/opt/qbo/sounds/watson.wav', 'wb') as audio_file:
          audio_file.write(result.content)
 
+      # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
+      wait_for_audio_ready(config)
+
       global is_animating
       is_animating = True
       anim_thread = threading.Thread(target=_animate_mouth_loop)
@@ -155,6 +158,9 @@ def _speak_pico2wave(text: str, lang_code: str) -> None:
       f"\"<volume level='{config['volume']}'>{clean}\" "
       f"&& {aplay_wav_shell_play_wav(config, _wav)}"
    )
+   # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
+   wait_for_audio_ready(config)
+
    global is_animating
    is_animating = True
    anim_thread = threading.Thread(target=_animate_mouth_loop)

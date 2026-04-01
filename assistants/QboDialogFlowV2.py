@@ -12,7 +12,7 @@ import time
 import random
 import speech_recognition as sr
 
-from qbo_audio import aplay_wav_shell_play_wav
+from qbo_audio import aplay_wav_shell_play_wav, wait_for_audio_ready
 
 
 class QboDialogFlowV2(object):
@@ -166,6 +166,9 @@ class QboDialogFlowV2(object):
 			speak = "pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play
 		else:
 			speak = "pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='" + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play
+
+		# Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
+		wait_for_audio_ready(self.config)
 
 		# Start mouth animation
 		self.is_animating = True

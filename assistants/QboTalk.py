@@ -20,7 +20,7 @@ import time
 import random
 from contextlib import contextmanager
 
-from qbo_audio import aplay_wav_shell_play_wav
+from qbo_audio import aplay_wav_shell_play_wav, wait_for_audio_ready
 
 #xx
 
@@ -269,6 +269,9 @@ class QBOtalk(object):
       self.controller.SetMouth(0)
 
   def _play_pico2wave(self, text, lang):
+    # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
+    wait_for_audio_ready(self.config)
+
     vol = self.config["volume"]
     wav = "/opt/qbo/sounds/pico2wave.wav"
     mode = str(self.config.get("audioPlaybackMode", "plughw")).lower()

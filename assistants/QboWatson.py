@@ -19,7 +19,7 @@ from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 
 
 from VisualRecognition import VisualRecognition
-from qbo_audio import subprocess_aplay_wav
+from qbo_audio import subprocess_aplay_wav, wait_for_audio_ready
 
 
 
@@ -258,6 +258,8 @@ class QBOWatson(object):
                        voice=voice
                    ).get_result().content
                )
+           # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
+           wait_for_audio_ready(self.config)
            self.is_animating = True
            anim_thread = threading.Thread(target=self._animate_mouth_loop)
            anim_thread.daemon = True

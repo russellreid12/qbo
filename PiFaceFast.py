@@ -247,6 +247,7 @@ class PIDController:
                    after the face re-enters the reachable range.
         """
         # Clamp dt to prevent derivative spikes from near-zero or very stale values
+        raw_dt = dt
         dt = max(0.016, min(0.5, dt))
         # Proportional
         p = self.kp * error
@@ -256,9 +257,15 @@ class PIDController:
             self._integral += error * dt
             self._integral = max(-self.integral_max, min(self.integral_max, self._integral))
         i = self.ki * self._integral
-        # Derivative (rate of error change)
-        d = self.kd * (error - self._prev_error) / dt
-        self._prev_error = error
+        # Derivative — zero it out after a large frame gap (raw_dt > 0.25s).
+        # prev_error is stale after an audio freeze; computing D from it would
+        # produce a misleading kick on the first recovery frame.
+        if raw_dt > 0.25:
+            d = 0.0
+            self._prev_error = error  # restart derivative from fresh position
+        else:
+            d = self.kd * (error - self._prev_error) / dt
+            self._prev_error = error
         # Store for debug inspection
         self.last_p = p
         self.last_i = i
@@ -1242,6 +1249,13 @@ while True:
 
 
            if abs(faceOffset_X) > _track_dead:
+               # Detect frame-gap freezes (audio init, ALSA stall, etc.).
+               # Reset the EMA smoother so the head snaps to the real face
+               # position instead of lagging for several frames post-freeze.
+               if dt > 0.25:
+                   _smoothed_cx = raw_cx
+                   _smoothed_cy = raw_cy
+                   print("Frame gap {:.2f}s — EMA smoother reset to raw position.".format(dt))
                # Saturated = servo already at its limit in the error direction.
                # Passing True stops integral accumulation against the wall (back-calc anti-windup).
                _pan_sat = (Xcoor <= Xmin and faceOffset_X < 0) or (Xcoor >= Xmax and faceOffset_X > 0)

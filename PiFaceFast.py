@@ -236,14 +236,25 @@ class PIDController:
         self._integral *= factor
         self._prev_error = 0.0
 
-    def update(self, error, dt):
+    def update(self, error, dt, saturated=False):
+        """
+        Compute PID output.
+
+        saturated: True when the servo is already at its mechanical limit in
+                   the direction of the error.  When saturated we skip the
+                   integral accumulation (back-calculation anti-windup) so the
+                   integrator doesn't wind up against a wall and keep pushing
+                   after the face re-enters the reachable range.
+        """
         # Clamp dt to prevent derivative spikes from near-zero or very stale values
         dt = max(0.016, min(0.5, dt))
         # Proportional
         p = self.kp * error
-        # Integral with anti-windup clamp
-        self._integral += error * dt
-        self._integral = max(-self.integral_max, min(self.integral_max, self._integral))
+        # Integral — skip accumulation if the actuator is saturated in the
+        # same direction as the error (prevents windup against mechanical limits).
+        if not saturated:
+            self._integral += error * dt
+            self._integral = max(-self.integral_max, min(self.integral_max, self._integral))
         i = self.ki * self._integral
         # Derivative (rate of error change)
         d = self.kd * (error - self._prev_error) / dt
@@ -488,7 +499,7 @@ _camera_flip_h    = _cfg_bool(config.get("cameraFlipHorizontal"),   False)
 _face_debug       = _cfg_bool(config.get("faceTrackingDebug"),      False)
 _face_debug_interval = int(config.get("faceTrackingDebugInterval", 10))  # print every N frames
 _track_dbg_n      = 0
-_track_dead       = int(config.get("faceTrackingDeadband", 8))
+_track_dead = int(config.get("faceTrackingDeadband", 16))   # widened: 14px error no longer chases
 _stabilize_sec    = float(config.get("faceTrackingStabilizeSec", 0.20))  # was 0.35 — resume tracking sooner after a servo move
 _face_stabilize_until = 0.0
 
@@ -506,12 +517,11 @@ _dbg_last_face_w   = 0               # last face bbox width
 _dbg_last_face_h   = 0               # last face bbox height
 _dbg_state_names   = {TRACK_SEARCHING: "SEARCHING", TRACK_DETECTING: "DETECTING", TRACK_LOCKED: "LOCKED"}
 
-# PID gains — tuned for ~5 FPS tracking loop on Pi 5
-# (old defaults 0.35/0.05/0.15/60 caused runaway at low FPS)
+# PID gains — tuned for ~7 FPS tracking loop on Pi 5
 _pid_kp = float(config.get("faceTrackingKp", 0.35))
-_pid_ki = float(config.get("faceTrackingKi", 0.02))
+_pid_ki = float(config.get("faceTrackingKi", 0.01))          # halved: less windup, less drift
 _pid_kd = float(config.get("faceTrackingKd", 0.08))
-_pid_integral_max = float(config.get("faceTrackingIntegralMax", 30.0))
+_pid_integral_max = float(config.get("faceTrackingIntegralMax", 15.0))  # reduced: unwinds faster
 
 # Max servo units the PID can move per frame — hard cap prevents overshoot
 # regardless of PID tuning.  At ~5 FPS, 40 units/frame ≈ 200 units/sec.
@@ -618,7 +628,8 @@ _last_greeted_name = None          # avoid greeting the same person repeatedly
 _greet_cooldown_sec = 30.0         # seconds before greeting the same person again
 _last_greeted_tm = 0.0
 _face_recog_pending = False        # flag set when a new face is first acquired
-_webcam_busy = False                # guard against concurrent webcam access
+_webcam_busy = False               # guard against concurrent webcam access
+_last_det_frame = None             # most recent detection frame — shared with greet thread
 
 
 
@@ -664,8 +675,10 @@ def read_webcam_detection_frame(cap):
 def greet_face_async():
    """
    Run in a background thread when a new face is first acquired.
-   Opens its OWN camera capture so it never sets _webcam_busy and never
-   interrupts the main tracking loop's detection.
+   Uses _last_det_frame (the most recent frame grabbed by the main loop)
+   so it NEVER opens a second VideoCapture — V4L2 does not allow two
+   concurrent opens of the same device and the attempt disrupts the
+   main capture pipeline.
    """
    global _last_greeted_name, _last_greeted_tm, _face_recog_pending
 
@@ -680,29 +693,27 @@ def greet_face_async():
        return
 
 
-   # Small delay so the main loop registers the face and sets green nose first
+   # Small delay so the main loop registers the face and sets green nose first.
    time.sleep(0.5)
 
 
-   # Open a SEPARATE capture so we never block the main tracking loop.
-   # This means _webcam_busy stays False and detection continues uninterrupted.
-   try:
-       _greet_cap = cv2.VideoCapture(int(config["camera"]), cv2.CAP_V4L2)
-       if not _greet_cap.isOpened():
-           _greet_cap = cv2.VideoCapture(int(config["camera"]))
-       _greet_cap.grab()  # flush one stale frame
-       vc.captureImage(_greet_cap)
-       vc.recognizeFaces()
-   except Exception as _ge:
-       print("greet_face_async capture error: {}".format(_ge))
+   # Use the last frame the main loop already captured — no camera access needed.
+   frame = _last_det_frame
+   if frame is None:
        if config["distro"] != "ibmwatson" and not Listening:
            controller.SetNoseColor(4)
        return
-   finally:
-       try:
-           _greet_cap.release()
-       except Exception:
-           pass
+
+
+   try:
+       # Write the shared frame to disk so vc.recognizeFaces() can read it.
+       cv2.imwrite(vc.tmp_file, frame)
+       vc.recognizeFaces()
+   except Exception as _ge:
+       print("greet_face_async recognition error: {}".format(_ge))
+       if config["distro"] != "ibmwatson" and not Listening:
+           controller.SetNoseColor(4)
+       return
 
 
    if not vc.faceResultsAvailable or not vc.faceResults:
@@ -1039,6 +1050,7 @@ while True:
        _det_t0 = time.time()
        aframe = read_webcam_detection_frame(webcam)
        if aframe is not None:
+           _last_det_frame = aframe  # share with greet_face_async (avoids 2nd camera open)
            detected = detect_faces_frame(aframe)
            _dbg_last_det_ms = (time.time() - _det_t0) * 1000.0
            if len(detected) > 0:
@@ -1063,8 +1075,8 @@ while True:
        _dbg_miss_count += 1
 
 
-       # Threshold raised from 5 to 10 — brief occlusions (hand wave, blink, head turn)
-       # no longer instantly lose the face lock. At ~15–30 FPS this is ~0.3–0.7 s grace.
+       # 25 missed frames (~1.25s at 7 FPS) before losing lock — tolerates brief
+       # occlusions, blinks, and head turns without dropping the tracking state.
        if face_not_found_idx > 25:
            face_not_found_idx = 0
            lastface = 0
@@ -1230,41 +1242,48 @@ while True:
 
 
            if abs(faceOffset_X) > _track_dead:
-               pan_out = pid_pan.update(faceOffset_X, dt)
+               # Saturated = servo already at its limit in the error direction.
+               # Passing True stops integral accumulation against the wall (back-calc anti-windup).
+               _pan_sat = (Xcoor <= Xmin and faceOffset_X < 0) or (Xcoor >= Xmax and faceOffset_X > 0)
+               pan_out = pid_pan.update(faceOffset_X, dt, saturated=_pan_sat)
                pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
                Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
                controller.SetServo(1, Xcoor, _track_servo_speed)
            else:
+               _pan_sat = False
                pid_pan.decay_integral()  # bleed off stale integral in deadband
 
 
            if abs(faceOffset_Y) > _track_dead:
-               tilt_out = pid_tilt.update(faceOffset_Y, dt)
+               _tilt_sat = (Ycoor <= Ymin and faceOffset_Y < 0) or (Ycoor >= Ymax and faceOffset_Y > 0)
+               tilt_out = pid_tilt.update(faceOffset_Y, dt, saturated=_tilt_sat)
                tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
                Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
                controller.SetServo(2, Ycoor, _track_servo_speed)
            else:
+               _tilt_sat = False
                pid_tilt.decay_integral()  # bleed off stale integral in deadband
+
+
            if _face_debug:
-                _track_dbg_n += 1
-                if _track_dbg_n % _face_debug_interval == 0:
-                    # Smoothing delta (how much EMA is shifting the raw reading)
-                    _sm_dx = _smoothed_cx - raw_cx
-                    _sm_dy = _smoothed_cy - raw_cy
-                    print("TRACK #{}: raw=({:.0f},{:.0f}) smooth=({:.0f},{:.0f}) Δsmooth=({:.1f},{:.1f}) "
-                          "offset=({:.1f},{:.1f}) centered={} state={}".format(
-                          _track_dbg_n, raw_cx, raw_cy, _smoothed_cx, _smoothed_cy,
-                          _sm_dx, _sm_dy, faceOffset_X, faceOffset_Y,
-                          face_is_centered, _dbg_state_names.get(track_state, "??")))
-                    print("  PAN  pid: P={:.2f} I={:.2f} D={:.2f} out={:.2f} | integral={:.2f} | servo X={}".format(
-                          pid_pan.last_p, pid_pan.last_i, pid_pan.last_d, pid_pan.last_output,
-                          pid_pan._integral, Xcoor))
-                    print("  TILT pid: P={:.2f} I={:.2f} D={:.2f} out={:.2f} | integral={:.2f} | servo Y={}".format(
-                          pid_tilt.last_p, pid_tilt.last_i, pid_tilt.last_d, pid_tilt.last_output,
-                          pid_tilt._integral, Ycoor))
-                    print("  face={}x{} conf={:.2f} det={:.1f}ms dt={:.3f}s deadband={} FPS={:.1f}".format(
-                          _dbg_last_face_w, _dbg_last_face_h, _dbg_last_conf,
-                          _dbg_last_det_ms, dt, _track_dead, _dbg_fps_value))
+               _track_dbg_n += 1
+               if _track_dbg_n % _face_debug_interval == 0:
+                   _sm_dx = _smoothed_cx - raw_cx
+                   _sm_dy = _smoothed_cy - raw_cy
+                   print("TRACK #{}: raw=({:.0f},{:.0f}) smooth=({:.0f},{:.0f}) Dsmooth=({:.1f},{:.1f}) "
+                         "offset=({:.1f},{:.1f}) centered={} state={}".format(
+                         _track_dbg_n, raw_cx, raw_cy, _smoothed_cx, _smoothed_cy,
+                         _sm_dx, _sm_dy, faceOffset_X, faceOffset_Y,
+                         face_is_centered, _dbg_state_names.get(track_state, "??")))
+                   print("  PAN  pid: P={:.2f} I={:.2f} D={:.2f} out={:.2f} | integral={:.2f} | servo X={} sat={}".format(
+                         pid_pan.last_p, pid_pan.last_i, pid_pan.last_d, pid_pan.last_output,
+                         pid_pan._integral, Xcoor, _pan_sat))
+                   print("  TILT pid: P={:.2f} I={:.2f} D={:.2f} out={:.2f} | integral={:.2f} | servo Y={} sat={}".format(
+                         pid_tilt.last_p, pid_tilt.last_i, pid_tilt.last_d, pid_tilt.last_output,
+                         pid_tilt._integral, Ycoor, _tilt_sat))
+                   print("  face={}x{} conf={:.2f} det={:.1f}ms dt={:.3f}s deadband={} FPS={:.1f}".format(
+                         _dbg_last_face_w, _dbg_last_face_h, _dbg_last_conf,
+                         _dbg_last_det_ms, dt, _track_dead, _dbg_fps_value))
 
 
    # --- Touch sensor ---

@@ -45,6 +45,31 @@ gassistant_proyectid: ''
 dialogflowv2_projectid: ''
 
 # -----------------------------------------------------------------------------
+# LLM Natural Language Generation (Dialogflow V2 mode)
+# Set llm_provider to 'openai' or 'gemini' to make QBO respond naturally.
+# Leave as 'none' to use Dialogflow's canned fulfillment text only.
+# -----------------------------------------------------------------------------
+llm_provider: none         # 'openai' | 'gemini' | 'none'
+
+# --- OpenAI (GPT) ---
+# Get key at: https://platform.openai.com/api-keys
+# Recommended model: gpt-4o-mini (fast + cheap) or gpt-4o (highest quality)
+openai_api_key: ''
+openai_model: gpt-4o-mini
+
+# --- Google Gemini ---
+# Get key at: https://aistudio.google.com/app/apikey
+# Recommended model: gemini-1.5-flash (fast + free tier available)
+gemini_api_key: ''
+gemini_model: gemini-1.5-flash
+
+# --- Shared LLM settings ---
+# robot_persona: personality prompt sent to the LLM on every turn
+robot_persona: "You are QBO, a friendly and curious social robot. Keep every reply short — 1 to 2 sentences — and conversational. Never use markdown, bullet points, or lists in your responses."
+llm_max_tokens: 80         # keep short for faster TTS (raise for longer answers)
+llm_temperature: 0.7       # 0.0 = deterministic, 1.0 = creative
+
+# -----------------------------------------------------------------------------
 # AUDIO PROFILES — toggle robot vs AirPods (see instructions at top)
 # -----------------------------------------------------------------------------
 

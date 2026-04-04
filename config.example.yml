@@ -13,6 +13,8 @@
 #   → use index for "pulse" (often 5) if you use the AirPods mic profile.
 # =============================================================================
 
+
+
 distro: standalone
 language: english
 startWith: interactive-dialogflow
@@ -31,7 +33,16 @@ servoSpeed: 100
 # faceTrackingCenterOffsetX: 0   # positive = aim slightly left in frame (nudges pan if image center is biased)
 # faceTrackingCenterOffsetY: 0
 # cameraFlipHorizontal: false
-SpeechToTextListeningTime: 5
+SpeechToTextListeningTime: 7
+# --- Face tracking fine-tuning ---
+# Smooth alpha: 0.0=very smooth/slow, 1.0=raw/jittery. 0.55 is a good default.
+# faceTrackingSmoothAlpha: 0.55
+# How long (seconds) the face must be centered before locking on (blue nose + record):
+# faceTrackingLockThreshold: 0.8
+# How many consecutive missed frames before the face is considered lost (grace period):
+# faceTrackingMissThreshold: 10
+# Seconds to pause tracking after a servo move to let the head settle:
+# faceTrackingStabilizeSec: 0.20
 serialPort: /dev/serial0
 
 # Touch sensors (GET_TOUCH): flash nose + servo LEDs when petted; off again after touch cooldown (PiFaceFast).

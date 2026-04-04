@@ -156,10 +156,14 @@ class QBOtalk(object):
       try:
         with _suppress_c_stderr():
           with open_microphone_source(self.m) as source:
-            self.r.adjust_for_ambient_noise(source)
+            self.r.adjust_for_ambient_noise(source, duration=0.5)  # shorter calibration
+        # Cache calibration time so we don't recalibrate on every StartBack() call.
+        # Re-calibrate if more than 60 seconds have passed.
+        self._last_calibration_time = time.time()
       except Exception as e:
         print("Warning: microphone ambient calibration skipped:", e)
         self.m = None
+        self._last_calibration_time = 0.0  # force re-calibrate on next try
 
   def set_controller(self, controller):
     """Accepts a serial controller instance for hardware sync."""
@@ -381,13 +385,29 @@ class QBOtalk(object):
       print("Warning: speech recognizer not available.")
       return None
 
-    with _suppress_c_stderr():
-      with open_microphone_source(self.m) as source:
-        self.r.adjust_for_ambient_noise(source)
+    # Only re-calibrate ambient noise if enough time has passed (avoids ~1s delay per utterance).
+    # First run always calibrates; after that, only every 60 seconds.
+    now = time.time()
+    _last_cal = getattr(self, "_last_calibration_time", 0.0)
+    if (now - _last_cal) > 60.0:
+      try:
+        with _suppress_c_stderr():
+          with open_microphone_source(self.m) as source:
+            self.r.adjust_for_ambient_noise(source, duration=0.5)
+        self._last_calibration_time = now
+        print("Ambient noise re-calibrated.")
+      except Exception as e:
+        print("Warning: ambient re-calibration skipped:", e)
+    else:
+      print("Skipping ambient recalibration (last: {:.0f}s ago)".format(now - _last_cal))
 
     print("start background listening")
     with _suppress_c_stderr():
-      return self.r.listen_in_background(self.m, self.callback)
+      _phrase_limit = int(self.config.get('SpeechToTextListeningTime', 7))
+      return self.r.listen_in_background(
+          self.m, self.callback,
+          phrase_time_limit=_phrase_limit  # cap recording to SpeechToTextListeningTime secs
+      )
 
   def StartBackListen(self):
     if self.m is None:

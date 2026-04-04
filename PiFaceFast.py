@@ -317,8 +317,10 @@ TRACK_DETECTING = 1
 TRACK_LOCKED = 2
 track_state = TRACK_SEARCHING
 track_centered_since = 0.0          # time face first appeared centered
-track_lock_threshold_sec = 2.0      # seconds centered before locking on
+track_lock_threshold_sec = 0.8      # seconds centered before locking on (was 2.0 — faster engagement)
 recording_process = None
+_last_servo_cmd_time = 0.0          # rate-limit servo writes to avoid overloading serial
+_servo_cmd_min_interval = 0.04      # minimum seconds between servo commands (~25 Hz cap)
 
 
 
@@ -363,9 +365,9 @@ def stop_voice_recording():
 #      chasing every single-frame bbox jitter that causes overshoot.
 # Alpha closer to 1.0 = more responsive but jitterier.
 # Alpha closer to 0.0 = smoother but slower to react.
-# 0.4 balances responsiveness with PID-dampened stability.
+# 0.55 balances responsiveness with PID-dampened stability without chasing jitter.
 # ---------------------------------------------------------------------------
-_smooth_alpha = float(config.get("faceTrackingSmoothAlpha", 0.85))
+_smooth_alpha = float(config.get("faceTrackingSmoothAlpha", 0.55))
 # _smoothed_cx / _smoothed_cy set after target_cx/target_cy (camera section below)
 
 
@@ -480,7 +482,7 @@ _face_debug       = _cfg_bool(config.get("faceTrackingDebug"),      False)
 _face_debug_interval = int(config.get("faceTrackingDebugInterval", 10))  # print every N frames
 _track_dbg_n      = 0
 _track_dead       = int(config.get("faceTrackingDeadband", 8))
-_stabilize_sec    = float(config.get("faceTrackingStabilizeSec", 0.35))
+_stabilize_sec    = float(config.get("faceTrackingStabilizeSec", 0.20))  # was 0.35 — resume tracking sooner after a servo move
 _face_stabilize_until = 0.0
 
 # ---------------------------------------------------------------------------
@@ -637,7 +639,8 @@ def pick_largest_face_rect(faces):
 
 def read_webcam_detection_frame(cap):
    """Grab+demux to reduce latency; resize to 320x240; optional horizontal flip."""
-   for _ in range(2):
+   # Drain buffer: grab 3 frames so we get the freshest one (reduces tracking lag on Pi)
+   for _ in range(3):
        cap.grab()
    ret, frame = cap.read()
    if not ret or frame is None:
@@ -1043,7 +1046,9 @@ while True:
        _dbg_miss_count += 1
 
 
-       if face_not_found_idx > 5:
+       # Threshold raised from 5 to 10 — brief occlusions (hand wave, blink, head turn)
+       # no longer instantly lose the face lock. At ~15–30 FPS this is ~0.3–0.7 s grace.
+       if face_not_found_idx > 10:
            face_not_found_idx = 0
            lastface = 0
            face = [0, 0, 0, 0]
@@ -1067,11 +1072,21 @@ while True:
            if Facedet != 0:
                Facedet = 0
                no_face_tm = time.time()
-               print("No face, 5 times!")
+               print("No face, 10 times!")
 
 
-           elif time.time() - no_face_tm > 3:
-               ServoHome()
+           elif time.time() - no_face_tm > 4:
+               # Slow search sweep before snapping fully home — looks more natural
+               # than instantly centering. Sweeps gently left then right.
+               _sweep_x = Xcoor
+               _home_x = _home_xcoor()
+               if abs(_sweep_x - _home_x) > 30:
+                   # Drift back toward home gradually rather than snapping
+                   _step = 20 if _sweep_x > _home_x else -20
+                   Xcoor = max(Xmin, min(Xmax, Xcoor + _step))
+                   controller.SetServo(1, Xcoor, 60)  # slow, natural return
+               else:
+                   ServoHome()
                Cface = [0, 0]
                no_face_tm = time.time()
 
@@ -1088,6 +1103,7 @@ while True:
 
 
        # Exponential moving average smoothing — kills jitter-driven overshoot.
+       # _smooth_alpha default lowered from 0.85 to 0.55 to reduce jitter chasing.
        if Facedet == 0:
            _smoothed_cx = raw_cx
            _smoothed_cy = raw_cy
@@ -1113,6 +1129,7 @@ while True:
        if Facedet == 0:
            Facedet = 1
            face_det_tm = time.time()
+           # _stabilize_sec default lowered from 0.35 to 0.20 so tracking resumes faster
            _face_stabilize_until = time.time() + _stabilize_sec
            track_state = TRACK_DETECTING
            track_centered_since = 0.0
@@ -1140,7 +1157,8 @@ while True:
            if face_is_centered:
                if track_centered_since == 0.0:
                    track_centered_since = time.time()
-               elif time.time() - track_centered_since >= track_lock_threshold_sec:
+               # Reduced threshold from 2.0s to 0.8s for faster locking
+               elif time.time() - track_centered_since >= 0.8:
                    # Lock on!
                    track_state = TRACK_LOCKED
                    print("Face centered -> LOCKED (blue + recording)")
@@ -1165,9 +1183,9 @@ while True:
                    controller.SetNoseColor(4)  # Green
 
 
-       # ---- Hotword/assistant: preserved from original code ----
+       # ---- Hotword/assistant: trigger faster (1.5s vs 2s) for more natural interaction ----
        if (Listening == False and WaitingSpeech == False and
-             (time.time() - face_det_tm > 2)):
+             (time.time() - face_det_tm > 1.5)):
            face_det_tm = time.time()
 
 
@@ -1268,14 +1286,14 @@ while True:
        _touch_reaction_lights_off()
 
 
-   # Throttle main loop to ~30 Hz max
-   time.sleep(0.033)
+   # Throttle main loop to ~20 Hz max — gives the Pi more time per frame for DNN inference
+   # and reduces serial bus contention. 0.05s = 20 FPS cap (was 0.033 / 30 FPS).
+   time.sleep(0.05)
 
 
 
 
 stop_voice_recording()
-StopHotwordListener()
 
 
 

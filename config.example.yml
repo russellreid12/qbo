@@ -43,6 +43,13 @@ SpeechToTextListeningTime: 7
 # faceTrackingMissThreshold: 10
 # Seconds to pause tracking after a servo move to let the head settle:
 # faceTrackingStabilizeSec: 0.20
+faceTrackingDeadband: 16         # increase if head still hunts at center (try 20)
+faceTrackingKp: 0.35             # lower for slower/smoother tracking
+faceTrackingKi: 0.01             # lower if tilt integral still winds up
+faceTrackingIntegralMax: 15.0    # raise if responsiveness feels sluggish
+faceTrackingMaxStep: 40          # lower (e.g. 25) to reduce per-frame jerk
+faceTrackingSmoothAlpha: 0.55    # lower for smoother (slower) face position tracking
+
 serialPort: /dev/serial0
 
 # Touch sensors (GET_TOUCH): flash nose + servo LEDs when petted; off again after touch cooldown (PiFaceFast).

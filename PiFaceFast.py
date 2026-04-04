@@ -380,7 +380,14 @@ _track_servo_speed = int(config.get("faceTrackingServoSpeed", 100))
 if talk and hasattr(talk, "set_controller"):
     talk.set_controller(controller)
 
-# vc = VisualRecognition()
+# Visual Recognition — optional; requires face_recognition + Pillow packages.
+# Wrapped in try/except so a missing dependency doesn't prevent boot.
+try:
+    vc = VisualRecognition()
+    print("VisualRecognition initialised.")
+except Exception as _vc_err:
+    vc = None
+    print("VisualRecognition unavailable ({}); face greeting disabled.".format(_vc_err))
 
 # Robust speaker initialization (retry loop using existing controller)
 def _retry_enable_speaker(ctrl, max_retries=5, delay=2):
@@ -667,6 +674,13 @@ def greet_face_async():
    _face_recog_pending = False
 
 
+   # vc is None when face_recognition / VisualRecognition failed to load at boot.
+   if vc is None:
+       if config["distro"] != "ibmwatson" and not Listening:
+           controller.SetNoseColor(4)
+       return
+
+
    # If the main loop is actively using the webcam, skip recognition this
    # cycle to avoid a race on cv2.VideoCapture (causes empty frames).
    if _webcam_busy:
@@ -818,7 +832,7 @@ def WaitForSpeech():
                return
 
 
-           elif config["distro"] != "ibmwatson" and vc.askAboutMe(talk.strAudio):
+           elif config["distro"] != "ibmwatson" and vc is not None and vc.askAboutMe(talk.strAudio):
                talk.GetResponse = False
 
 

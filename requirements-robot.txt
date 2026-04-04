@@ -11,3 +11,7 @@ apiai
 # Optional / legacy dependencies:
 # - google-assistant-sdk, dialogflow, mycroft-core (only if you enable those modes)
 # - ibm-watson (+ ibm-cloud-sdk-core): pip install ibm-watson — only if config distro == ibmwatson
+
+# LLM providers for natural conversation (Dialogflow V2 mode — install ONE or both):
+# openai                   # for GPT-4o-mini / GPT-4o
+# google-generativeai      # for Gemini 1.5 Flash / Pro

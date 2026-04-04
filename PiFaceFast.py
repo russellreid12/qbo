@@ -992,7 +992,6 @@ _dbg_loop_iter = 0   # main-loop iteration counter for debug summary
 
 while True:
    fr_time = time.time()
-   _last_track_time = fr_time  # keep fresh every loop to prevent stale dt spikes
 
    # ---- Debug: FPS and loop counter ----
    _dbg_loop_iter += 1
@@ -1210,7 +1209,10 @@ while True:
                if interactiveTypeGAssistant == True:
                    gassistant.start_conversation_from_face()
                elif interactiveTypeGAssistant == False and config["startWith"] == "interactive-dialogflow-v2":
-                   DialogflowV2SeeFace()
+                   # Run in a background thread — recording takes 5-7s and would
+                   # freeze the tracking loop if called directly here.
+                   _thread.start_new_thread(DialogflowV2SeeFace, ())
+                   Listening = True
                else:
                    listen_thd = talk.StartBack()
                    Listening = True

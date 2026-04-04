@@ -525,7 +525,7 @@ _last_track_time = time.time()
 # DNN face detector (much more accurate than Haar cascades)
 # ---------------------------------------------------------------------------
 _face_detector_type = config.get("faceDetector", "dnn")  # "dnn" or "haar"
-_dnn_confidence_min = float(config.get("faceDetectorConfidence", 0.5))
+_dnn_confidence_min = float(config.get("faceDetectorConfidence", 0.35))
 _dnn_net = None
 
 if _face_detector_type == "dnn":
@@ -646,9 +646,8 @@ def pick_largest_face_rect(faces):
 
 def read_webcam_detection_frame(cap):
    """Grab+demux to reduce latency; resize to 320x240; optional horizontal flip."""
-   # Drain buffer: grab 3 frames so we get the freshest one (reduces tracking lag on Pi)
-   for _ in range(3):
-       cap.grab()
+   # Drain 1 buffered frame so we get a fresh one without wasting detection cycles.
+   cap.grab()
    ret, frame = cap.read()
    if not ret or frame is None:
        return None
@@ -665,10 +664,10 @@ def read_webcam_detection_frame(cap):
 def greet_face_async():
    """
    Run in a background thread when a new face is first acquired.
-   Nose goes green immediately, then blue while speaking the greeting,
-   then back to green. Unknown faces get green nose but no speech.
+   Opens its OWN camera capture so it never sets _webcam_busy and never
+   interrupts the main tracking loop's detection.
    """
-   global _last_greeted_name, _last_greeted_tm, _face_recog_pending, _webcam_busy
+   global _last_greeted_name, _last_greeted_tm, _face_recog_pending
 
 
    _face_recog_pending = False
@@ -681,24 +680,29 @@ def greet_face_async():
        return
 
 
-   # If the main loop is actively using the webcam, skip recognition this
-   # cycle to avoid a race on cv2.VideoCapture (causes empty frames).
-   if _webcam_busy:
-       if config["distro"] != "ibmwatson" and not Listening:
-           controller.SetNoseColor(4)
-       return
-
-
-   # Small delay so the main loop has time to set Facedet=1 and green nose
+   # Small delay so the main loop registers the face and sets green nose first
    time.sleep(0.5)
 
 
-   _webcam_busy = True
+   # Open a SEPARATE capture so we never block the main tracking loop.
+   # This means _webcam_busy stays False and detection continues uninterrupted.
    try:
-       vc.captureImage(webcam)
+       _greet_cap = cv2.VideoCapture(int(config["camera"]), cv2.CAP_V4L2)
+       if not _greet_cap.isOpened():
+           _greet_cap = cv2.VideoCapture(int(config["camera"]))
+       _greet_cap.grab()  # flush one stale frame
+       vc.captureImage(_greet_cap)
        vc.recognizeFaces()
+   except Exception as _ge:
+       print("greet_face_async capture error: {}".format(_ge))
+       if config["distro"] != "ibmwatson" and not Listening:
+           controller.SetNoseColor(4)
+       return
    finally:
-       _webcam_busy = False
+       try:
+           _greet_cap.release()
+       except Exception:
+           pass
 
 
    if not vc.faceResultsAvailable or not vc.faceResults:
@@ -1061,7 +1065,7 @@ while True:
 
        # Threshold raised from 5 to 10 — brief occlusions (hand wave, blink, head turn)
        # no longer instantly lose the face lock. At ~15–30 FPS this is ~0.3–0.7 s grace.
-       if face_not_found_idx > 10:
+       if face_not_found_idx > 25:
            face_not_found_idx = 0
            lastface = 0
            face = [0, 0, 0, 0]

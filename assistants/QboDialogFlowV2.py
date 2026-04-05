@@ -336,29 +336,60 @@ class QboDialogFlowV2(object):
     # Text-to-speech
     # -----------------------------------------------------------------------
 
-    def SpeechText(self, text_to_speech):
-        # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth animation
+    def _play_pico2wave(self, text, lang):
+        import shlex
+        # Synchronize: ensure Bluetooth / AirPod delay completes before starting mouth
         wait_for_audio_ready(self.config)
 
-        _wav = "/opt/qbo/sounds/pico2wave.wav"
-        _play = aplay_wav_shell_play_wav(self.config, _wav)
-        if self.config["language"] == "spanish":
-            speak = ("pico2wave -l \"es-ES\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='"
-                     + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play)
+        vol = self.config.get("volume", 100)
+        wav = "/opt/qbo/sounds/pico2wave.wav"
+        mode = str(self.config.get("audioPlaybackMode", "plughw")).lower()
+        
+        # Pre-clean text to avoid shell/SSML issues
+        clean_text = str(text).replace('"', '').replace("'", "")
+        
+        gen = (
+            f'pico2wave -l {shlex.quote(lang)} '
+            f'-w {shlex.quote(wav)} '
+            f'"<volume level=\'{vol}\'>{clean_text}"'
+        )
+        
+        hw = self.config.get("audioPlaybackHwDevice") or self.config.get("audioPlaybackDevice") or "default"
+        try:
+            gain_db = float(self.config.get("audioPlaybackGainDb", 0))
+        except (TypeError, ValueError):
+            gain_db = 0.0
+        gain_sox = " gain {:.1f}".format(gain_db) if gain_db != 0 else ""
+
+        if mode == "hq48":
+            cmd = (
+                "{gen} && sox {wav} -t raw -e signed-integer -b 32 -c 2 - rate -v 48000{gain} "
+                "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
+            ).format(gen=gen, wav=shlex.quote(wav), hw=shlex.quote(str(hw)), gain=gain_sox)
+        elif mode == "raw48":
+            g0 = ("gain {:.1f} ".format(gain_db) if gain_db != 0 else "")
+            cmd = (
+                "{gen} && sox {wav} {g0}-t raw -r 48000 -e signed-integer -b 32 -c 2 - "
+                "| aplay -D {hw} -t raw -f S32_LE -r 48000 -c 2"
+            ).format(gen=gen, wav=shlex.quote(wav), hw=shlex.quote(str(hw)), g0=g0)
         else:
-            speak = ("pico2wave -l \"en-US\" -w /opt/qbo/sounds/pico2wave.wav \"<volume level='"
-                     + str(self.config["volume"]) + "'>" + text_to_speech + "\" && " + _play)
+            cmd = "{gen} && {aplay}".format(
+                gen=gen, aplay=aplay_wav_shell_play_wav(self.config, wav)
+            )
 
         self.is_animating = True
         anim_thread = threading.Thread(target=self._animate_mouth_loop)
         anim_thread.daemon = True
         anim_thread.start()
-
         try:
-            subprocess.call(speak, shell=True)
+            subprocess.call(cmd, shell=True)
         finally:
             self.is_animating = False
             anim_thread.join(timeout=1.0)
+
+    def SpeechText(self, text_to_speech):
+        lang = "es-ES" if self.config["language"] == "spanish" else "en-US"
+        self._play_pico2wave(text_to_speech, lang)
 
 
 if __name__ == '__main__':

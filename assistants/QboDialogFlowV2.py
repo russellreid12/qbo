@@ -172,7 +172,9 @@ class QboDialogFlowV2(object):
     # -----------------------------------------------------------------------
 
     def detect_intent_stream(self):
-        import dialogflow_v2 as dialogflow
+        # google-cloud-dialogflow replaces the discontinued dialogflow-v2 package.
+        # Classes are accessed directly on the module (no .enums. or .types. prefix).
+        from google.cloud import dialogflow_v2 as dialogflow
         session_client = dialogflow.SessionsClient()
 
         session_id = uuid.uuid4()
@@ -181,24 +183,24 @@ class QboDialogFlowV2(object):
         if self.config["language"] == "spanish":
             language_code = 'es-ES'
 
-        audio_encoding = dialogflow.enums.AudioEncoding.AUDIO_ENCODING_LINEAR_16
+        audio_encoding = dialogflow.AudioEncoding.AUDIO_ENCODING_LINEAR_16
         sample_rate_hertz = 16000
 
         session_path = session_client.session_path(self.project_id, session_id)
 
         def request_generator(audio_config, audio_file_path):
-            query_input = dialogflow.types.QueryInput(audio_config=audio_config)
-            yield dialogflow.types.StreamingDetectIntentRequest(
+            query_input = dialogflow.QueryInput(audio_config=audio_config)
+            yield dialogflow.StreamingDetectIntentRequest(
                 session=session_path, query_input=query_input)
             with open(audio_file_path, 'rb') as audio_file:
                 while True:
                     chunk = audio_file.read(4096)
                     if not chunk:
                         break
-                    yield dialogflow.types.StreamingDetectIntentRequest(
+                    yield dialogflow.StreamingDetectIntentRequest(
                         input_audio=chunk)
 
-        audio_config = dialogflow.types.InputAudioConfig(
+        audio_config = dialogflow.InputAudioConfig(
             audio_encoding=audio_encoding, language_code=language_code,
             sample_rate_hertz=sample_rate_hertz)
 

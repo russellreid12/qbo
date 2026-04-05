@@ -40,8 +40,11 @@ class QboDialogFlowV2(object):
         self.RATE = 16000
         self.CHUNK = 1024
         self.RECORD_SECONDS = self.config['SpeechToTextListeningTime']
-        self.strAudio = ""
+        # Required flags by PiFaceFast.py main loop
         self.GetAudio = False
+        self.strAudio = ""
+        self.GetResponse = False
+        self.Response = ""
         self.r = sr.Recognizer()
         self.controller = None
         self.is_animating = False

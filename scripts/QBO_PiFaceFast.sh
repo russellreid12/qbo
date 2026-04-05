@@ -20,17 +20,11 @@ if [[ $1 = $START ]]; then
 	else
 		echo "launching PiFaceFast"
 		export XDG_RUNTIME_DIR=/run/user/$(id -u)
-		PYTHONHTTPSVERIFY=0
-		# Cron runs as user qbo with bare python3 — use a venv if present (same deps as dev).
-		if [ -x /opt/qbo/qbo_venv/bin/python3 ]; then
-			/opt/qbo/qbo_venv/bin/python3 /opt/qbo/PiFaceFast.py &
-		elif [ -x "${HOME}/qbo_venv/bin/python3" ]; then
-			"${HOME}/qbo_venv/bin/python3" /opt/qbo/PiFaceFast.py &
-		elif [ -x /home/pi/qbo_venv/bin/python3 ]; then
-			/home/pi/qbo_venv/bin/python3 /opt/qbo/PiFaceFast.py &
-		else
-			python3 /opt/qbo/PiFaceFast.py &
-		fi
+		export PYTHONPATH=/opt/qbo
+		export GOOGLE_APPLICATION_CREDENTIALS=/opt/qbo/.config/dialogflowv2.json
+		
+		cd /opt/qbo
+		/home/pi/qbo_venv/bin/python3 /opt/qbo/PiFaceFast.py &
 	fi
 fi
 

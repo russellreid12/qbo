@@ -977,8 +977,16 @@ def StopHotwordListener():
 
 
 def DialogflowV2SeeFace():
-   talk.record_wav()
-   talk.detect_intent_stream()
+   global Listening
+   try:
+       talk.record_wav()
+       talk.detect_intent_stream()
+   except Exception as e:
+       print("DialogflowV2SeeFace error: {}".format(e))
+   finally:
+       # Always release the Listening gate so the main loop can trigger again.
+       Listening = False
+       StartHotwordListener()
 
 
 

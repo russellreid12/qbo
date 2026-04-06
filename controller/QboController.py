@@ -410,7 +410,7 @@ class Controller(object):
 
   def SetAngleRelative(self, Axis, Angle):
       cmd_buffer = ([Axis, Angle & 0xff, (Angle >> 8) & 0xff])
-      print("SetAnlgeRelative: (" + str(Axis) + "," + str(Angle) + ")")
+      print("SetAngleRelative: (" + str(Axis) + "," + str(Angle) + ")")
       return self.SendCmdQBO(Command(self.SET_SERVO_ANGLE_REL, len(cmd_buffer), cmd_buffer))
 
 
@@ -461,7 +461,19 @@ class Controller(object):
   def SetEnableSpeaker(self, enable):
       """Tell head MCU to enable (1) or disable (0) the speaker path; QBO may be silent without this."""
       b = 1 if enable else 0
-      return self.GetHeadCmd("SET_ENABLE_SPEAKER", [b])
+      return self.SendCmdQBO(Command(self.cmd_params["SET_ENABLE_SPEAKER"][0], 1, [b]))
+
+
+  def SetServoLed(self, Axis, Enable):
+      """Enable (1) or disable (0) the LED ring on a specific servo axis (1=pan, 2=tilt)."""
+      b = 1 if Enable else 0
+      return self.SendCmdQBO(Command(self.cmd_params["SET_SERVO_LED"][0], 2, [Axis, b]))
+
+
+  def SetTouchParams(self, sampletime, average, cycletime):
+      """Set capacitive touch sensor parameters for the head controller."""
+      cmd_buffer = [sampletime & 0xFF, average & 0xFF, cycletime & 0xFF]
+      return self.SendCmdQBO(Command(self.cmd_params["SET_TOUC_PARAMS"][0], 3, cmd_buffer))
 
   def SetTouchAutoOff(self, enable, delay_ms, trig_angle):
       """Configure Arduino firmware touch lockout during servo movement.

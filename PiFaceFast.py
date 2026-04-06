@@ -459,8 +459,8 @@ def _touch_reaction_lights_on():
            controller.SetNoseColor(2)
    if _cfg_bool(config.get("touchReactionServoLeds"), True):
        try:
-           controller.GetHeadCmd("SET_SERVO_LED", [1, 1])
-           controller.GetHeadCmd("SET_SERVO_LED", [2, 1])
+           controller.SetServoLed(1, 1)
+           controller.SetServoLed(2, 1)
        except Exception:
            pass
 
@@ -470,8 +470,8 @@ def _touch_reaction_lights_off():
        return
    if _cfg_bool(config.get("touchReactionServoLeds"), True):
        try:
-           controller.GetHeadCmd("SET_SERVO_LED", [1, 0])
-           controller.GetHeadCmd("SET_SERVO_LED", [2, 0])
+           controller.SetServoLed(1, 0)
+           controller.SetServoLed(2, 0)
        except Exception:
            pass
    if config["distro"] != "ibmwatson":
@@ -528,7 +528,7 @@ _dbg_state_names   = {TRACK_SEARCHING: "SEARCHING", TRACK_DETECTING: "DETECTING"
 _pid_kp = float(config.get("faceTrackingKp", 0.35))
 _pid_ki = float(config.get("faceTrackingKi", 0.01))          # halved: less windup, less drift
 _pid_kd = float(config.get("faceTrackingKd", 0.08))
-_pid_integral_max = float(config.get("faceTrackingIntegralMax", 15.0))  # reduced: unwinds faster
+_pid_integral_max = float(config.get("faceTrackingIntegralMax", 3.0))  # reduced: unwinds faster
 
 # Max servo units the PID can move per frame — hard cap prevents overshoot
 # regardless of PID tuning.  At ~5 FPS, 40 units/frame ≈ 200 units/sec.
@@ -1255,36 +1255,35 @@ while True:
            dt = now - _last_track_time
            _last_track_time = now
 
+           # Saturated = servo already at its limit in the error direction.
+           # Passing True stops integral accumulation against the wall (back-calc anti-windup).
+           _pan_sat = (Xcoor <= Xmin and faceOffset_X < 0) or (Xcoor >= Xmax and faceOffset_X > 0)
+           _tilt_sat = (Ycoor <= Ymin and faceOffset_Y < 0) or (Ycoor >= Ymax and faceOffset_Y > 0)
 
-           if abs(faceOffset_X) > _track_dead:
-               # Detect frame-gap freezes (audio init, ALSA stall, etc.).
-               # Reset the EMA smoother so the head snaps to the real face
-               # position instead of lagging for several frames post-freeze.
-               if dt > 0.25:
-                   _smoothed_cx = raw_cx
-                   _smoothed_cy = raw_cy
-                   print("Frame gap {:.2f}s — EMA smoother reset to raw position.".format(dt))
-               # Saturated = servo already at its limit in the error direction.
-               # Passing True stops integral accumulation against the wall (back-calc anti-windup).
-               _pan_sat = (Xcoor <= Xmin and faceOffset_X < 0) or (Xcoor >= Xmax and faceOffset_X > 0)
-               pan_out = pid_pan.update(faceOffset_X, dt, saturated=_pan_sat)
-               pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
-               Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
-               controller.SetServo(1, Xcoor, _track_servo_speed)
-           else:
-               _pan_sat = False
-               pid_pan.decay_integral()  # bleed off stale integral in deadband
+           pan_out = pid_pan.update(faceOffset_X, dt, saturated=_pan_sat)
+           tilt_out = pid_tilt.update(faceOffset_Y, dt, saturated=_tilt_sat)
 
+           # Combined rate-limited block
+           if now - _last_servo_cmd_time >= _servo_cmd_min_interval:
+               if abs(faceOffset_X) > _track_dead:
+                   if dt > 0.25:
+                       _smoothed_cx = raw_cx
+                       _smoothed_cy = raw_cy
+                       print("Frame gap {:.2f}s — EMA smoother reset to raw position.".format(dt))
+                   pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
+                   Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
+                   controller.SetServo(1, Xcoor, _track_servo_speed)
+               else:
+                   pid_pan.decay_integral()
 
-           if abs(faceOffset_Y) > _track_dead:
-               _tilt_sat = (Ycoor <= Ymin and faceOffset_Y < 0) or (Ycoor >= Ymax and faceOffset_Y > 0)
-               tilt_out = pid_tilt.update(faceOffset_Y, dt, saturated=_tilt_sat)
-               tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
-               Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
-               controller.SetServo(2, Ycoor, _track_servo_speed)
-           else:
-               _tilt_sat = False
-               pid_tilt.decay_integral()  # bleed off stale integral in deadband
+               if abs(faceOffset_Y) > _track_dead:
+                   tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
+                   Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
+                   controller.SetServo(2, Ycoor, _track_servo_speed)
+               else:
+                   pid_tilt.decay_integral()
+
+               _last_servo_cmd_time = now
 
 
            if _face_debug:

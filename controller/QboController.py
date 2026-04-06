@@ -205,7 +205,7 @@ class Controller(object):
       isInputEscaped = False
       bExit = False
       wait_start = time.time()
-      deadline = wait_start + 0.15
+      deadline = wait_start + 0.85
       rx_data = []
       try:
           while time.time() < deadline:

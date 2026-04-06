@@ -484,6 +484,33 @@ class Controller(object):
       return self.SendCmdQBO(Command(self.cmd_params["SET_TOUCH_AUTO_OFF"][0], 4, cmd_buffer))
 
 
+  def GetServoPosition(self, Axis):
+      """Read current 10-bit position from the servo via Arduino (returns [lsb, msb])."""
+      return self.GetHeadCmd("GET_SERVO_POSITION", [Axis])
+
+
+  def GetServoCwLimit(self, Axis):
+      """Read stored clockwise travel limit from the servo register (returns [lsb, msb])."""
+      return self.GetHeadCmd("GET_SERVO_CW_LIM", [Axis])
+
+
+  def GetServoCcwLimit(self, Axis):
+      """Read stored counter-clockwise travel limit from the servo register (returns [lsb, msb])."""
+      return self.GetHeadCmd("GET_SERVO_CCW_LIM", [Axis])
+
+
+  def SetServoCwLimit(self, Axis, Limit):
+      """Write new clockwise travel limit to the servo register (0-1023)."""
+      cmd_buffer = [Axis, Limit & 0xFF, (Limit >> 8) & 0xFF]
+      return self.SendCmdQBO(Command(self.cmd_params["SET_SERVO_CW_LIM"][0], 3, cmd_buffer))
+
+
+  def SetServoCcwLimit(self, Axis, Limit):
+      """Write new counter-clockwise travel limit to the servo register (0-1023)."""
+      cmd_buffer = [Axis, Limit & 0xFF, (Limit >> 8) & 0xFF]
+      return self.SendCmdQBO(Command(self.cmd_params["SET_SERVO_CCW_LIM"][0], 3, cmd_buffer))
+
+
 
 
 

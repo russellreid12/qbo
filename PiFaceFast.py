@@ -1265,6 +1265,7 @@ while True:
 
            # Combined rate-limited block
            if now - _last_servo_cmd_time >= _servo_cmd_min_interval:
+               pan_moved = False
                if abs(faceOffset_X) > _track_dead:
                    if dt > 0.25:
                        _smoothed_cx = raw_cx
@@ -1273,10 +1274,13 @@ while True:
                    pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
                    Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
                    controller.SetServo(1, Xcoor, _track_servo_speed)
+                   pan_moved = True
                else:
                    pid_pan.decay_integral()
 
                if abs(faceOffset_Y) > _track_dead:
+                   if pan_moved:
+                       time.sleep(0.01)
                    tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
                    Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
                    controller.SetServo(2, Ycoor, _track_servo_speed)
@@ -1309,6 +1313,8 @@ while True:
 
    # --- Touch sensor ---
    if _serial_touch_probe and (time.time() - touch_samp > 0.5):
+       if time.time() - _last_servo_cmd_time < 0.05:
+           time.sleep(0.02)
        touch_samp = time.time()
        last_face_det_tm = time.time()
        qbo_touch = controller.GetHeadCmd("GET_TOUCH", 0)

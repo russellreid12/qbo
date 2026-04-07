@@ -435,6 +435,17 @@ except KeyError:
    controller.SetMicrophoneGain(100)
 
 
+# Unlock hardware limits for the swapped orientation
+try:
+    controller.SetServoCwLimit(2, Xmin)
+    controller.SetServoCcwLimit(2, Xmax)
+    time.sleep(0.05)
+    controller.SetServoCwLimit(1, Ymin)
+    controller.SetServoCcwLimit(1, Ymax)
+    time.sleep(0.05)
+except Exception as e:
+    print(f"Warning: could not set servo limits: {e}")
+
 controller.SetServo(2, Xcoor, int(config["servoSpeed"]))
 controller.SetServo(1, Ycoor, int(config["servoSpeed"]))
 print("Positioning head: XCoor " + str(Xcoor) + ", YCoor " + str(Ycoor))

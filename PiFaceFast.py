@@ -435,15 +435,15 @@ except KeyError:
    controller.SetMicrophoneGain(100)
 
 
-controller.SetServo(1, Xcoor, int(config["servoSpeed"]))
-controller.SetServo(2, Ycoor, int(config["servoSpeed"]))
+controller.SetServo(2, Xcoor, int(config["servoSpeed"]))
+controller.SetServo(1, Ycoor, int(config["servoSpeed"]))
 print("Positioning head: XCoor " + str(Xcoor) + ", YCoor " + str(Ycoor))
 
 
 time.sleep(1)
-controller.SetPid(1, 26, 2, 16)
-time.sleep(1)
 controller.SetPid(2, 26, 2, 16)
+time.sleep(1)
+controller.SetPid(1, 26, 2, 16)
 time.sleep(1)
 controller.SetNoseColor(0)
 
@@ -459,8 +459,8 @@ def _touch_reaction_lights_on():
            controller.SetNoseColor(2)
    if _cfg_bool(config.get("touchReactionServoLeds"), True):
        try:
-           controller.SetServoLed(1, 1)
            controller.SetServoLed(2, 1)
+           controller.SetServoLed(1, 1)
        except Exception:
            pass
 
@@ -470,8 +470,8 @@ def _touch_reaction_lights_off():
        return
    if _cfg_bool(config.get("touchReactionServoLeds"), True):
        try:
-           controller.SetServoLed(1, 0)
            controller.SetServoLed(2, 0)
+           controller.SetServoLed(1, 0)
        except Exception:
            pass
    if config["distro"] != "ibmwatson":
@@ -805,9 +805,9 @@ def ServoHome():
 
    Xcoor = _home_xcoor()
    Ycoor = int(Ymin + float(config["headYPosition"]) / 100 * (Ymax - Ymin))
-   controller.SetServo(1, Xcoor, int(config["servoSpeed"]))
+   controller.SetServo(2, Xcoor, int(config["servoSpeed"]))
    time.sleep(0.1)
-   controller.SetServo(2, Ycoor, int(config["servoSpeed"]))
+   controller.SetServo(1, Ycoor, int(config["servoSpeed"]))
    touch_tm = time.time()
    _face_stabilize_until = time.time() + _stabilize_sec
 
@@ -939,9 +939,9 @@ def WaitTouchMove():
        return
 
 
-   controller.SetServo(1, Xcoor, int(config["servoSpeed"]))
+   controller.SetServo(2, Xcoor, int(config["servoSpeed"]))
    time.sleep(0.1)
-   controller.SetServo(2, Ycoor, int(config["servoSpeed"]))
+   controller.SetServo(1, Ycoor, int(config["servoSpeed"]))
    time.sleep(1)
    touch_tm = time.time()
    mutex_wait_touch = False
@@ -1128,7 +1128,7 @@ while True:
                    # Drift back toward home gradually rather than snapping
                    _step = 20 if _sweep_x > _home_x else -20
                    Xcoor = max(Xmin, min(Xmax, Xcoor + _step))
-                   controller.SetServo(1, Xcoor, 60)  # slow, natural return
+                   controller.SetServo(2, Xcoor, 60)  # slow, natural return
                else:
                    ServoHome()
                Cface = [0, 0]
@@ -1273,7 +1273,7 @@ while True:
                        print("Frame gap {:.2f}s — EMA smoother reset to raw position.".format(dt))
                    pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
                    Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
-                   controller.SetServo(1, Xcoor, _track_servo_speed)
+                   controller.SetServo(2, Xcoor, _track_servo_speed)
                    pan_moved = True
                else:
                    pid_pan.decay_integral()
@@ -1283,7 +1283,7 @@ while True:
                        time.sleep(0.01)
                    tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
                    Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
-                   controller.SetServo(2, Ycoor, _track_servo_speed)
+                   controller.SetServo(1, Ycoor, _track_servo_speed)
                else:
                    pid_tilt.decay_integral()
 
@@ -1324,24 +1324,24 @@ while True:
        if touch_tm == 0 and qbo_touch and qbo_touch != [0]:
            _touch_reaction_lights_on()
            if qbo_touch == [1]:
-               controller.SetServo(1, Xmax - 25, int(config["servoSpeed"]))
+               controller.SetServo(2, Xmax - 25, int(config["servoSpeed"]))
                time.sleep(0.002)
-               controller.SetServo(2, Ymin - 5, int(config["servoSpeed"]))
+               controller.SetServo(1, Ymin - 5, int(config["servoSpeed"]))
                _thread.start_new_thread(WaitTouchMove, ())
                time.sleep(1)
 
 
            elif qbo_touch == [2]:
                time.sleep(0.002)
-               controller.SetServo(2, Ymin - 5, int(config["servoSpeed"]))
+               controller.SetServo(1, Ymin - 5, int(config["servoSpeed"]))
                _thread.start_new_thread(WaitTouchMove, ())
                time.sleep(1)
 
 
            elif qbo_touch == [3]:
-               controller.SetServo(1, Xmin + 25, int(config["servoSpeed"]))
+               controller.SetServo(2, Xmin + 25, int(config["servoSpeed"]))
                time.sleep(0.002)
-               controller.SetServo(2, Ymin - 5, int(config["servoSpeed"]))
+               controller.SetServo(1, Ymin - 5, int(config["servoSpeed"]))
                _thread.start_new_thread(WaitTouchMove, ())
                time.sleep(1)
 

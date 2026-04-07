@@ -106,6 +106,7 @@ except Exception:
    sys.exit()
 
 controller = Controller(ser)
+_serial_lock = threading.Lock()   # Prevent concurrent serial access from tracking loop and background threads
 Speak.set_controller(controller)
 # (Note: talk.set_controller will be called after assistants are initialized below)
 
@@ -990,8 +991,9 @@ def StopHotwordListener():
 def DialogflowV2SeeFace():
    global Listening
    try:
-       talk.record_wav()
-       talk.detect_intent_stream()
+       with _serial_lock:
+           talk.record_wav()
+           talk.detect_intent_stream()
    except Exception as e:
        print("DialogflowV2SeeFace error: {}".format(e))
    finally:
@@ -1237,8 +1239,9 @@ while True:
                    controller.SetNoseColor(4)  # Green
 
 
-       # ---- Hotword/assistant: trigger faster (1.5s vs 2s) for more natural interaction ----
+       # ---- Hotword/assistant: trigger only when face is LOCKED (confirmed centered) ----
        if (Listening == False and WaitingSpeech == False and
+             track_state == TRACK_LOCKED and
              (time.time() - face_det_tm > 1.5)):
            face_det_tm = time.time()
 
@@ -1285,7 +1288,8 @@ while True:
                        print("Frame gap {:.2f}s — EMA smoother reset to raw position.".format(dt))
                    pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
                    Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
-                   controller.SetServo(2, Xcoor, _track_servo_speed)
+                   with _serial_lock:
+                       controller.SetServo(2, Xcoor, _track_servo_speed)
                    pan_moved = True
                else:
                    pid_pan.decay_integral()
@@ -1295,7 +1299,8 @@ while True:
                        time.sleep(0.01)
                    tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
                    Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
-                   controller.SetServo(1, Ycoor, _track_servo_speed)
+                   with _serial_lock:
+                       controller.SetServo(1, Ycoor, _track_servo_speed)
                else:
                    pid_tilt.decay_integral()
 

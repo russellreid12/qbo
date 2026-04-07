@@ -1287,8 +1287,7 @@ while True:
                        print("Frame gap {:.2f}s — EMA smoother reset to raw position.".format(dt))
                    pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
                    Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
-                   with _serial_lock:
-                       controller.SetServo(2, Xcoor, _track_servo_speed)
+                   controller.SetServo(2, Xcoor, _track_servo_speed)
                    pan_moved = True
                else:
                    pid_pan.decay_integral()
@@ -1298,8 +1297,7 @@ while True:
                        time.sleep(0.01)
                    tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
                    Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
-                   with _serial_lock:
-                       controller.SetServo(1, Ycoor, _track_servo_speed)
+                   controller.SetServo(1, Ycoor, _track_servo_speed)
                else:
                    pid_tilt.decay_integral()
 

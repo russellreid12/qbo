@@ -339,7 +339,7 @@ track_lock_threshold_sec = 0.8      # seconds centered before locking on (was 2.
 recording_process = None
 _last_servo_cmd_time = 0.0          # rate-limit servo writes to avoid overloading serial
 _servo_cmd_min_interval = 0.04      # minimum seconds between servo commands (~25 Hz cap)
-
+_servo_cmd_min_interval = float(config.get("faceTrackingServoInterval", _servo_cmd_min_interval))
 
 
 

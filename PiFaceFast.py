@@ -1226,8 +1226,7 @@ while True:
 
        # ---- State machine: LOCKED — stay blue, keep recording ----
        elif track_state == TRACK_LOCKED:
-           if config["distro"] != "ibmwatson":
-               controller.SetNoseColor(1)  # Blue while locked
+           # Nose already set blue on state entry — do NOT resend every frame (serial spam)
            # If face drifts off-center significantly, drop back to DETECTING
            if not face_is_centered:
                track_state = TRACK_DETECTING
@@ -1261,7 +1260,9 @@ while True:
 
 
        # --- Pan / tilt servo tracking (PID) ---
-       if touch_det == False and time.time() >= _face_stabilize_until:
+       # Guard: skip while LOCKED — face already centered, head holds position during recording.
+       # This removes 25Hz SetServo spam from the Arduino's busiest serial window.
+       if touch_det == False and time.time() >= _face_stabilize_until and track_state != TRACK_LOCKED:
            now = time.time()
            dt = now - _last_track_time
            _last_track_time = now

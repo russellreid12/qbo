@@ -24,6 +24,7 @@ from controller.QboController import Controller
 from VisualRecognition import VisualRecognition
 from assistants.QboDialogFlowV2 import QboDialogFlowV2
 from hotword_openwakeword import OpenWakeWordListener
+import video_recorder
 
 
 
@@ -1025,6 +1026,69 @@ fr_time = 0
 _dbg_loop_iter = 0   # main-loop iteration counter for debug summary
 
 
+
+
+# ---------------------------------------------------------------------------
+# External Command Listener (from BLE / Web Dashboard)
+# ---------------------------------------------------------------------------
+FIFO_CMD = "/opt/qbo/pipes/pipe_cmd"
+
+def external_command_listener():
+    """Reads commands from named pipe and executes them via controller."""
+    if not os.path.exists(os.path.dirname(FIFO_CMD)):
+        os.makedirs(os.path.dirname(FIFO_CMD), exist_ok=True)
+    
+    try:
+        os.mkfifo(FIFO_CMD)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            print(f"Error creating command pipe: {e}")
+
+    print(f"External command listener started: {FIFO_CMD}")
+    while True:
+        try:
+            # open blocks until someone writes to it
+            with open(FIFO_CMD, "r") as fifo:
+                line = fifo.read().strip()
+                if not line:
+                    continue
+                
+                print(f"External command received: {line}")
+                
+                # Handle special recording command
+                if line == "REC_30":
+                    video_recorder.record_clip(30)
+                    continue
+                
+                # Handle standard QBO command strings (e.g. -c nose -co blue)
+                # We can reuse the logic from PiCmd.py or implement a simple one here.
+                # For now, let's support basic nose and servo commands.
+                parts = line.split()
+                if "-c" in parts:
+                    cmd_idx = parts.index("-c") + 1
+                    if cmd_idx < len(parts):
+                        cmd_name = parts[cmd_idx]
+                        
+                        if cmd_name == "nose" and "-co" in parts:
+                            color_idx = parts.index("-co") + 1
+                            if color_idx < len(parts):
+                                color = parts[color_idx]
+                                colors = {"none": 0, "blue": 1, "red": 2, "green": 4}
+                                if color in colors:
+                                    controller.SetNoseColor(colors[color])
+                        
+                        elif cmd_name == "move_rel" and "-x" in parts and "-a" in parts:
+                            try:
+                                ax = int(parts[parts.index("-x") + 1])
+                                ang = int(parts[parts.index("-a") + 1])
+                                controller.SetAngleRelative(ax, ang)
+                            except: pass
+
+        except Exception as e:
+            print(f"External command listener error: {e}")
+            time.sleep(1)
+
+_thread.start_new_thread(external_command_listener, ())
 
 
 # ---------------------------------------------------------------------------

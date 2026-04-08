@@ -8,6 +8,8 @@ import { SongsPage } from './pages/SongsPage';
 import { UsersPage } from './pages/UsersPage';
 import { AlertsPage } from './pages/AlertsPage';
 
+import { ClipsPage } from './pages/ClipsPage';
+
 export type OperationalMode = 'guardian' | 'companion';
 
 export default function App() {
@@ -17,6 +19,7 @@ export default function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/mode" element={<ModePage />} />
         <Route path="/video" element={<VideoPage />} />
+        <Route path="/clips" element={<ClipsPage />} />
         <Route path="/control" element={<ControlPage />} />
         <Route path="/songs" element={<SongsPage />} />
         <Route path="/users" element={<UsersPage />} />

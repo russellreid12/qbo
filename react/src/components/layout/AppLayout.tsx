@@ -19,6 +19,7 @@ export function AppLayout({ children }: Props) {
           </NavLink>
           <NavLink to="/mode">Mode</NavLink>
           <NavLink to="/video">Video</NavLink>
+          <NavLink to="/clips">Clips</NavLink>
           <NavLink to="/control">Control</NavLink>
           <NavLink to="/songs">Songs</NavLink>
           <NavLink to="/users">Users</NavLink>

@@ -49,6 +49,11 @@ export class BleRobotClient {
 
     await this.characteristic.writeValue(payload);
   }
+
+  async startRecording(): Promise<void> {
+    // Send the specialized commandREC_30 to trigger a 30s hardware-accelerated clip
+    return this.sendCommand('REC_30');
+  }
 }
 
 export const BLE_CONSTANTS = {

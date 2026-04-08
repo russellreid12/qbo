@@ -4,6 +4,7 @@ const ROBOT_COMMAND_CHARACTERISTIC_UUID = '7f4b0002-0c56-4a58-9b20-52d2b4f35a01'
 export class BleRobotClient {
   private device: BluetoothDevice | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
+  private heartbeatInterval: any = null;
 
   static isSupported(): boolean {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
@@ -19,6 +20,11 @@ export class BleRobotClient {
       optionalServices: [ROBOT_SERVICE_UUID],
     });
 
+    this.device.addEventListener('gattserverdisconnected', () => {
+      console.warn('BLE disconnected — clearing heartbeat');
+      this.stopHeartbeat();
+    });
+
     const gattServer = await this.device.gatt?.connect();
     if (!gattServer) {
       throw new Error('Failed to connect to robot GATT server.');
@@ -26,6 +32,8 @@ export class BleRobotClient {
 
     const service = await gattServer.getPrimaryService(ROBOT_SERVICE_UUID);
     this.characteristic = await service.getCharacteristic(ROBOT_COMMAND_CHARACTERISTIC_UUID);
+    
+    this.startHeartbeat();
   }
 
   isConnected(): boolean {
@@ -33,8 +41,30 @@ export class BleRobotClient {
   }
 
   async disconnect(): Promise<void> {
+    this.stopHeartbeat();
     this.device?.gatt?.disconnect();
     this.characteristic = null;
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat(); // clear existing if any
+    this.heartbeatInterval = setInterval(async () => {
+      try {
+        if (this.isConnected()) {
+          // Send no-op to keep BLE link active (nose off)
+          await this.sendCommand('-c nose -co none');
+        }
+      } catch (e) {
+        console.warn('BLE Heartbeat failed:', e);
+      }
+    }, 5000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
   }
 
   async sendCommand(command: string): Promise<void> {

@@ -60,3 +60,6 @@ export const BLE_CONSTANTS = {
   ROBOT_SERVICE_UUID,
   ROBOT_COMMAND_CHARACTERISTIC_UUID,
 };
+
+// Singleton instance to persist connection state across React page navigations
+export const globalBleClient = new BleRobotClient();

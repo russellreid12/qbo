@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BleRobotClient } from '../services/bleRobot';
+import { BleRobotClient, globalBleClient } from '../services/bleRobot';
 
 const PRESET_COMMANDS = {
   forward: '-c move -x 2 -a 100',
@@ -9,15 +9,14 @@ const PRESET_COMMANDS = {
 };
 
 export function ControlPage() {
-  const bleClient = useMemo(() => new BleRobotClient(), []);
-  const [status, setStatus] = useState('Disconnected');
+  const [status, setStatus] = useState(globalBleClient.isConnected() ? 'Connected' : 'Disconnected');
   const [error, setError] = useState('');
   const [customCommand, setCustomCommand] = useState('-c nose -co blue');
 
   const connect = async () => {
     setError('');
     try {
-      await bleClient.connect();
+      await globalBleClient.connect();
       setStatus('Connected');
     } catch (connectError) {
       setStatus('Disconnected');
@@ -26,14 +25,14 @@ export function ControlPage() {
   };
 
   const disconnect = async () => {
-    await bleClient.disconnect();
+    await globalBleClient.disconnect();
     setStatus('Disconnected');
   };
 
   const send = async (command: string) => {
     setError('');
     try {
-      await bleClient.sendCommand(command);
+      await globalBleClient.sendCommand(command);
       setStatus(`Sent: ${command}`);
     } catch (sendError) {
       setError((sendError as Error).message);

@@ -3,10 +3,10 @@ import { ModeStatusCard } from '../components/status/ModeStatusCard';
 import { RobotHealthCard } from '../components/status/RobotHealthCard';
 import { RecentEventsCard } from '../components/status/RecentEventsCard';
 import { RecordButton } from '../components/video/RecordButton';
-import { BleRobotClient } from '../services/bleRobot';
+import { BleRobotClient, globalBleClient } from '../services/bleRobot';
 
 export function DashboardPage() {
-  const bleClient = useMemo(() => new BleRobotClient(), []);
+  const bleClient = globalBleClient;
 
   return (
     <div className="grid grid-2">

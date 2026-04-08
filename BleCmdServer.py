@@ -36,7 +36,7 @@ def ensure_pipe(path: str) -> None:
 def publish_to_qbo(command: str) -> None:
     ensure_pipe(FIFO_CMD)
     with open(FIFO_CMD, "w", encoding="utf-8") as fifo:
-        fifo.write(command)
+        fifo.write(command + "\n")
 
 
 def parse_payload(value: bytearray) -> str:
@@ -53,7 +53,7 @@ def read_status(_: int, **__) -> bytearray:
 def build_write_callback(server: BlessServer):
     def write_request(characteristic, value: bytearray, **kwargs):
         global last_status
-        if str(characteristic.uuid) != COMMAND_CHARACTERISTIC_UUID:
+        if str(characteristic.uuid).lower() != COMMAND_CHARACTERISTIC_UUID.lower():
             return
 
         try:
@@ -79,7 +79,7 @@ async def run(adapter: Optional[str], name: str) -> None:
     await server.add_new_characteristic(
         SERVICE_UUID,
         COMMAND_CHARACTERISTIC_UUID,
-        GATTCharacteristicProperties.write | GATTCharacteristicProperties.write_without_response,
+        GATTCharacteristicProperties.write,
         None,
         GATTAttributePermissions.writeable,
     )

@@ -8,6 +8,7 @@ if not os.environ.get("QBO_VERBOSE_LIBS"):
     os.environ.setdefault("ORT_LOG_SEVERITY_LEVEL", "4")
 
 import datetime
+import errno
 import subprocess
 import cv2
 import serial

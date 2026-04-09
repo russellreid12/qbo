@@ -5,6 +5,7 @@ import asyncio
 import errno
 import logging
 import os
+import threading
 from typing import Optional
 
 from bless import BlessServer
@@ -33,20 +34,20 @@ def ensure_pipe(path: str) -> None:
             raise
 
 
+def _write_to_pipe(command: str) -> None:
+    """Blocking write — runs in its own thread so it never stalls the BLE event loop."""
+    try:
+        with open(FIFO_CMD, "w", encoding="utf-8") as fifo:
+            fifo.write(command + "\n")
+        logger.info("Command written to pipe: %s", command)
+    except OSError as e:
+        logger.warning("pipe_cmd write error for '%s': %s", command, e)
+
+
 def publish_to_qbo(command: str) -> None:
     ensure_pipe(FIFO_CMD)
-    try:
-        fd = os.open(FIFO_CMD, os.O_WRONLY | os.O_NONBLOCK)
-        try:
-            os.write(fd, (command + "\n").encode("utf-8"))
-            logger.info("Command written to pipe: %s", command)
-        finally:
-            os.close(fd)
-    except OSError as e:
-        if e.errno == errno.ENXIO:
-            logger.warning("pipe_cmd: no reader attached (PiFaceFast not running?), command dropped: %s", command)
-        else:
-            raise
+    t = threading.Thread(target=_write_to_pipe, args=(command,), daemon=True)
+    t.start()
 
 
 def parse_payload(value: bytearray) -> str:

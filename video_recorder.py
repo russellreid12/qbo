@@ -42,17 +42,16 @@ def record_clip(duration=10):
     # -b:v: bitrate (2M is plenty for 320x240)
     cmd = [
         "ffmpeg", "-y",
-        "-f", "v4l2", "-i", "/dev/video0",
+        "-i", "/dev/video0",
         "-t", str(duration),
-        "-c:v", "h264_v4l2m2m",
-        "-b:v", "1M",
         filename
     ]
-    
+
+    log_path = f"{CLIP_DIR}/ffmpeg_last.log"
     try:
-        # Run in background via Popen
-        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print(f"VideoRecorder: Started {duration}s recording to {filename}")
+        with open(log_path, "w") as log_f:
+            proc = subprocess.Popen(cmd, stdout=log_f, stderr=log_f)
+        print(f"VideoRecorder: Started {duration}s recording to {filename} (pid={proc.pid})")
         return filename
     except Exception as e:
         print(f"VideoRecorder: Error starting ffmpeg: {e}")

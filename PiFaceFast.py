@@ -1125,7 +1125,6 @@ while True:
 
 
    if _recording_target_duration > 0:
-       global _cv_video_writer, _cv_record_end_time
        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
        filename = f"/opt/qbo/recordings/clip_{timestamp}.mp4"
        os.makedirs(os.path.dirname(filename), exist_ok=True)

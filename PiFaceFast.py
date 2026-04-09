@@ -108,7 +108,35 @@ except Exception:
    sys.exit()
 
 controller = Controller(ser)
+import queue as _queue_mod
 _serial_lock = threading.Lock()   # Prevent concurrent serial access from tracking loop and background threads
+
+# ---------------------------------------------------------------------------
+# Serial Write Queue — Fix 1 from qbo_serial_improvements.md
+# All background-thread serial writes go through serial_send() so they never
+# race against each other or the main tracking loop.
+# ---------------------------------------------------------------------------
+_serial_queue = _queue_mod.Queue()
+
+def _serial_worker():
+    while True:
+        fn = _serial_queue.get()
+        if fn is None:
+            break
+        try:
+            with _serial_lock:
+                fn()
+        except Exception as _e:
+            print(f"Serial worker error: {_e}")
+        finally:
+            _serial_queue.task_done()
+
+threading.Thread(target=_serial_worker, daemon=True, name="serial_worker").start()
+
+def serial_send(fn):
+    """Queue a zero-argument callable for serial execution on the serial worker thread."""
+    _serial_queue.put(fn)
+
 Speak.set_controller(controller)
 # (Note: talk.set_controller will be called after assistants are initialized below)
 
@@ -715,7 +743,7 @@ def greet_face_async():
    # vc is None when face_recognition / VisualRecognition failed to load at boot.
    if vc is None:
        if config["distro"] != "ibmwatson" and not Listening:
-           controller.SetNoseColor(4)
+           serial_send(lambda: controller.SetNoseColor(4))
        return
 
 
@@ -727,7 +755,7 @@ def greet_face_async():
    frame = _last_det_frame
    if frame is None:
        if config["distro"] != "ibmwatson" and not Listening:
-           controller.SetNoseColor(4)
+           serial_send(lambda: controller.SetNoseColor(4))
        return
 
 
@@ -738,14 +766,14 @@ def greet_face_async():
    except Exception as _ge:
        print("greet_face_async recognition error: {}".format(_ge))
        if config["distro"] != "ibmwatson" and not Listening:
-           controller.SetNoseColor(4)
+           serial_send(lambda: controller.SetNoseColor(4))
        return
 
 
    if not vc.faceResultsAvailable or not vc.faceResults:
        # Still make sure nose is green even if recognition found nothing
        if config["distro"] != "ibmwatson" and not Listening:
-           controller.SetNoseColor(4)
+           serial_send(lambda: controller.SetNoseColor(4))
        return
 
 
@@ -756,7 +784,7 @@ def greet_face_async():
    if name == "Unknown":
        # Unknown face — green nose, no speech
        if config["distro"] != "ibmwatson" and not Listening:
-           controller.SetNoseColor(4)
+           serial_send(lambda: controller.SetNoseColor(4))
        return
 
 
@@ -764,7 +792,7 @@ def greet_face_async():
    # Only greet if it's a different person OR enough time has passed
    if name == _last_greeted_name and (now - _last_greeted_tm) < _greet_cooldown_sec:
        if config["distro"] != "ibmwatson" and not Listening:
-           controller.SetNoseColor(4)
+           serial_send(lambda: controller.SetNoseColor(4))
        return
 
 
@@ -784,7 +812,7 @@ def greet_face_async():
 
    # Nose blue while speaking, then back to green when done
    if config["distro"] != "ibmwatson":
-       controller.SetNoseColor(1)
+       serial_send(lambda: controller.SetNoseColor(1))
 
 
    # QBOtalk.SpeechText() takes exactly one argument — the string to speak
@@ -795,7 +823,7 @@ def greet_face_async():
 
 
    if config["distro"] != "ibmwatson" and not Listening:
-       controller.SetNoseColor(4)
+       serial_send(lambda: controller.SetNoseColor(4))
 
 
 
@@ -858,9 +886,9 @@ def WaitForSpeech():
            if talk.onListeningChanged:
                talk.onListeningChanged = False
                if talk.onListening:
-                   controller.SetNoseColor(1)
+                   serial_send(lambda: controller.SetNoseColor(1))
                else:
-                   controller.SetNoseColor(0)
+                   serial_send(lambda: controller.SetNoseColor(0))
 
 
        # FIX: use 'and' not '&' for boolean logic
@@ -926,7 +954,7 @@ def WaitForSpeech():
 
 
                if config["distro"] != "ibmwatson":
-                   controller.SetNoseColor(0)
+                   serial_send(lambda: controller.SetNoseColor(0))
 
 
                talk.GetResponse = False
@@ -958,9 +986,10 @@ def WaitTouchMove():
        return
 
 
-   controller.SetServo(2, Xcoor, int(config["servoSpeed"]))
+   _wx, _wy, _wspeed = Xcoor, Ycoor, int(config["servoSpeed"])
+   serial_send(lambda: controller.SetServo(2, _wx, _wspeed))
    time.sleep(0.1)
-   controller.SetServo(1, Ycoor, int(config["servoSpeed"]))
+   serial_send(lambda: controller.SetServo(1, _wy, _wspeed))
    time.sleep(1)
    touch_tm = time.time()
    mutex_wait_touch = False
@@ -1086,13 +1115,14 @@ def external_command_listener():
                                 color = parts[color_idx]
                                 colors = {"none": 0, "blue": 1, "red": 2, "green": 4}
                                 if color in colors:
-                                    controller.SetNoseColor(colors[color])
+                                    _c = colors[color]
+                                    serial_send(lambda: controller.SetNoseColor(_c))
                         
                         elif cmd_name == "move_rel" and "-x" in parts and "-a" in parts:
                             try:
                                 ax = int(parts[parts.index("-x") + 1])
                                 ang = int(parts[parts.index("-a") + 1])
-                                controller.SetAngleRelative(ax, ang)
+                                serial_send(lambda: controller.SetAngleRelative(ax, ang))
                             except: pass
 
         except Exception as e:
@@ -1100,6 +1130,22 @@ def external_command_listener():
             time.sleep(1)
 
 _thread.start_new_thread(external_command_listener, ())
+
+
+# ---------------------------------------------------------------------------
+# Speech worker — Fix 2 from qbo_serial_improvements.md
+# Single persistent thread replaces spawning a new WaitForSpeech thread every
+# loop iteration (~20× per second = thread storm).
+# ---------------------------------------------------------------------------
+_speech_event = threading.Event()
+
+def _speech_worker():
+    while True:
+        _speech_event.wait()   # sleeps until signalled
+        _speech_event.clear()
+        WaitForSpeech()
+
+threading.Thread(target=_speech_worker, daemon=True, name="speech_worker").start()
 
 
 # ---------------------------------------------------------------------------
@@ -1141,7 +1187,7 @@ while True:
            _cv_video_writer = None
        _recording_target_duration = 0
    faceFound = False
-   _thread.start_new_thread(WaitForSpeech, ())
+   _speech_event.set()   # signal the persistent speech_worker instead of spawning a new thread
 
 
    if HotwordListened:

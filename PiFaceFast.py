@@ -1125,13 +1125,12 @@ while True:
 
 
    if _recording_target_duration > 0:
-       import datetime, os
+       global _cv_video_writer, _cv_record_end_time
        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
        filename = f"/opt/qbo/recordings/clip_{timestamp}.mp4"
        os.makedirs(os.path.dirname(filename), exist_ok=True)
        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
        fps = _dbg_fps_value if _dbg_fps_value > 2 else 15.0
-       global _cv_video_writer, _cv_record_end_time
        _cv_video_writer = cv2.VideoWriter(filename, fourcc, fps, (320, 240))
        if _cv_video_writer.isOpened():
            _cv_record_end_time = time.time() + _recording_target_duration

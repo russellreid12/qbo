@@ -112,30 +112,54 @@ import queue as _queue_mod
 _serial_lock = threading.Lock()   # Prevent concurrent serial access from tracking loop and background threads
 
 # ---------------------------------------------------------------------------
-# Serial Write Queue — Fix 1 from qbo_serial_improvements.md
-# All background-thread serial writes go through serial_send() so they never
-# race against each other or the main tracking loop.
+# Serial Write Queue — Fix from qbo_priority_queue.md
+# Two queues: Priority for servo tracking, Normal for UI/cosmetic updates.
 # ---------------------------------------------------------------------------
-_serial_queue = _queue_mod.Queue()
+_serial_queue_priority = _queue_mod.Queue()  # servo tracking — time sensitive
+_serial_queue = _queue_mod.Queue()           # nose color, LEDs, etc — low priority
 
 def _serial_worker():
     while True:
-        fn = _serial_queue.get()
-        if fn is None:
-            break
+        # Always drain priority queue first
         try:
-            with _serial_lock:
-                fn()
-        except Exception as _e:
-            print(f"Serial worker error: {_e}")
-        finally:
-            _serial_queue.task_done()
+            fn = _serial_queue_priority.get_nowait()
+            try:
+                with _serial_lock:
+                    fn()
+            finally:
+                _serial_queue_priority.task_done()
+            continue  # loop back and check priority again before normal queue
+        except _queue_mod.Empty:
+            pass
+
+        # Then normal queue — but priority is checked again on next iteration
+        try:
+            fn = _serial_queue.get(timeout=0.05)
+            try:
+                with _serial_lock:
+                    fn()
+            finally:
+                _serial_queue.task_done()
+        except _queue_mod.Empty:
+            pass
 
 threading.Thread(target=_serial_worker, daemon=True, name="serial_worker").start()
 
 def serial_send(fn):
-    """Queue a zero-argument callable for serial execution on the serial worker thread."""
+    """Queue a low-priority serial command — skips cosmetic updates during active recording."""
+    if recording_process is not None and time.time() < _recording_grace_until + 1.0:
+        return
     _serial_queue.put(fn)
+
+def serial_send_tracking(fn):
+    """Queue a high-priority servo tracking command — drops stale commands."""
+    while not _serial_queue_priority.empty():
+        try:
+            _serial_queue_priority.get_nowait()
+            _serial_queue_priority.task_done()
+        except _queue_mod.Empty:
+            break
+    _serial_queue_priority.put(fn)
 
 Speak.set_controller(controller)
 # (Note: talk.set_controller will be called after assistants are initialized below)
@@ -369,6 +393,9 @@ track_centered_since = 0.0          # time face first appeared centered
 track_lock_threshold_sec = 0.8      # seconds centered before locking on (was 2.0 — faster engagement)
 recording_process = None
 
+_recording_grace_sec = float(config.get("recordingGraceSec", 2.0))
+_recording_grace_until = 0.0
+
 _recording_target_duration = 0
 _cv_video_writer = None
 _cv_record_end_time = 0
@@ -412,6 +439,11 @@ def stop_voice_recording():
            recording_process.kill()
        print("Recording stopped")
        recording_process = None
+
+def _stop_recording_if_grace_expired():
+   """Stop recording only if the grace period has passed."""
+   if time.time() >= _recording_grace_until:
+       stop_voice_recording()
 
 
 # ---------------------------------------------------------------------------
@@ -1265,7 +1297,7 @@ while True:
            # ---- State machine: transition to SEARCHING ----
            if track_state != TRACK_SEARCHING:
                print("Face lost -> SEARCHING")
-               stop_voice_recording()
+               _stop_recording_if_grace_expired()
                track_state = TRACK_SEARCHING
                track_centered_since = 0.0
                pid_pan.reset()
@@ -1384,10 +1416,12 @@ while True:
            if not face_is_centered:
                track_state = TRACK_DETECTING
                track_centered_since = 0.0
-               stop_voice_recording()
-               print("Face moved -> DETECTING (green)")
+               # Don't stop recording immediately — brief drift or detection wobble
+               # should not cut an active conversation
+               _recording_grace_until = time.time() + _recording_grace_sec
+               print("Face moved -> DETECTING (recording grace period {:.1f}s)".format(_recording_grace_sec))
                if config["distro"] != "ibmwatson":
-                   controller.SetNoseColor(4)  # Green
+                   serial_send(lambda: controller.SetNoseColor(4))  # Green
 
 
        # ---- Hotword/assistant: trigger only when face is LOCKED (confirmed centered) ----
@@ -1439,7 +1473,7 @@ while True:
                        print("Frame gap {:.2f}s — EMA smoother reset to raw position.".format(dt))
                    pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
                    Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
-                   controller.SetServo(2, Xcoor, _track_servo_speed)
+                   serial_send_tracking(lambda x=Xcoor: controller.SetServo(2, x, _track_servo_speed))
                    pan_moved = True
                else:
                    pid_pan.decay_integral()
@@ -1449,7 +1483,7 @@ while True:
                        time.sleep(0.01)
                    tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
                    Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
-                   controller.SetServo(1, Ycoor, _track_servo_speed)
+                   serial_send_tracking(lambda y=Ycoor: controller.SetServo(1, y, _track_servo_speed))
                else:
                    pid_tilt.decay_integral()
 

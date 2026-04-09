@@ -613,6 +613,19 @@ _pid_integral_max = float(config.get("faceTrackingIntegralMax", 3.0))  # reduced
 # regardless of PID tuning.  At ~5 FPS, 40 units/frame ≈ 200 units/sec.
 _track_max_step = int(config.get("faceTrackingMaxStep", 40))
 
+def _scheduled_kp(error, base_kp):
+    """Reduce Kp for large errors to prevent overshoot at distance.
+    Full gain within 30px, tapered down to 40% for errors above 80px."""
+    abs_err = abs(error)
+    if abs_err <= 30:
+        return base_kp              # full gain when close to target
+    elif abs_err >= 80:
+        return base_kp * 0.4        # 40% gain for large distant errors
+    else:
+        # Linear taper between 30px and 80px
+        t = (abs_err - 30) / 50.0
+        return base_kp * (1.0 - 0.6 * t)
+
 pid_pan  = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
 pid_tilt = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
 _last_track_time = time.time()
@@ -1460,6 +1473,10 @@ while True:
            _pan_sat = (Xcoor <= Xmin and faceOffset_X < 0) or (Xcoor >= Xmax and faceOffset_X > 0)
            _tilt_sat = (Ycoor <= Ymin and faceOffset_Y < 0) or (Ycoor >= Ymax and faceOffset_Y > 0)
 
+           _kp_pan  = _scheduled_kp(faceOffset_X, _pid_kp)
+           _kp_tilt = _scheduled_kp(faceOffset_Y, _pid_kp)
+           pid_pan.kp  = _kp_pan
+           pid_tilt.kp = _kp_tilt
            pan_out = pid_pan.update(faceOffset_X, dt, saturated=_pan_sat)
            tilt_out = pid_tilt.update(faceOffset_Y, dt, saturated=_tilt_sat)
 

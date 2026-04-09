@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 
-// For local dev, you might need to change this to the robot's IP
-// In production, we assume the dashboard and video server are on the same host
-const API_BASE = `http://${window.location.hostname}:5000`;
+// The video server always runs on the robot. Use its hostname or IP.
+// If QBo.local doesn't resolve on your network, replace with the robot's IP (e.g. 192.168.x.x)
+const ROBOT_HOST = import.meta.env.VITE_ROBOT_HOST ?? 'QBo.local';
+const API_BASE = `http://${ROBOT_HOST}:5000`;
 
 export function ClipsPage() {
   const [clips, setClips] = useState<string[]>([]);

@@ -144,11 +144,7 @@ export class BleRobotClient {
     return new Promise<ClipInfo[]>((resolve, reject) => {
       this.listResolve = resolve;
       this.listReject = reject;
-      this.listTimeout = setTimeout(() => {
-        this.listResolve = null;
-        this.listReject = null;
-        reject(new Error('Clip list request timed out after 15s'));
-      }, 15_000);
+      // Removed 15s timeout because large payloads or slow BLE stacks might exceed it
       this.sendCommand('LIST_CLIPS').catch(reject);
     });
   }
@@ -232,7 +228,7 @@ export class BleRobotClient {
       return;
     }
 
-    if (text === 'CLIP_END') {
+    if (text.includes('CLIP_END')) {
       this._finalizeClip();
       return;
     }

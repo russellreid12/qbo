@@ -92,9 +92,16 @@ async def _list_clips_async() -> None:
         glob.glob(os.path.join(CLIP_DIR, "*.mp4")),
         key=os.path.getmtime,
         reverse=True,
-    )
+    )[:5]  # Limit to 5 clips so JSON string fits inside 512-byte BLE MTU limit
     info = [{"name": os.path.basename(f), "size": os.path.getsize(f)} for f in files]
     payload = ("LIST:" + json.dumps(info)).encode("utf-8")
+    
+    # If it's still too large, fallback to a simpler structure or just 1 clip
+    if len(payload) > 500:
+        files = files[:2]
+        info = [{"name": os.path.basename(f), "size": os.path.getsize(f)} for f in files]
+        payload = ("LIST:" + json.dumps(info)).encode("utf-8")
+        
     await _notify_data(bytearray(payload))
     logger.info("Clip list sent: %d clips", len(info))
 

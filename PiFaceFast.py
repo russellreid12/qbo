@@ -1126,19 +1126,20 @@ while True:
 
    if _recording_target_duration > 0:
        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-       filename = f"/opt/qbo/recordings/clip_{timestamp}.mp4"
+       filename = f"/opt/qbo/recordings/clip_{timestamp}.avi"
        os.makedirs(os.path.dirname(filename), exist_ok=True)
-       fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+       fourcc = cv2.VideoWriter_fourcc(*'MJPG')
        fps = _dbg_fps_value if _dbg_fps_value > 2 else 15.0
        _cv_video_writer = cv2.VideoWriter(filename, fourcc, fps, (320, 240))
        if _cv_video_writer.isOpened():
            _cv_record_end_time = time.time() + _recording_target_duration
+           global _cv_last_filename
+           _cv_last_filename = filename
            print(f"VideoRecorder: Started OpenCV recording to {filename} for {_recording_target_duration}s")
        else:
            print("VideoRecorder: Failed to open cv2.VideoWriter codec")
            _cv_video_writer = None
        _recording_target_duration = 0
-
    faceFound = False
    _thread.start_new_thread(WaitForSpeech, ())
 
@@ -1172,6 +1173,14 @@ while True:
                    _cv_video_writer.release()
                    _cv_video_writer = None
                    print("VideoRecorder: OpenCV recording finished.")
+                   if '_cv_last_filename' in globals() and _cv_last_filename:
+                       import subprocess
+                       mp4_file = _cv_last_filename.replace('.avi', '.mp4')
+                       print(f"VideoRecorder: Transcoding {_cv_last_filename} to {mp4_file} via ffmpeg...")
+                       subprocess.Popen([
+                           "ffmpeg", "-y", "-i", _cv_last_filename,
+                           "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", mp4_file
+                       ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                else:
                    _cv_video_writer.write(aframe)
            _last_det_frame = aframe  # share with greet_face_async (avoids 2nd camera open)

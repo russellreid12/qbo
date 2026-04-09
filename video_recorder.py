@@ -52,10 +52,10 @@ def record_clip(duration=10):
         with open(log_path, "w") as log_f:
             proc = subprocess.Popen(cmd, stdout=log_f, stderr=log_f)
         print(f"VideoRecorder: Started {duration}s recording to {filename} (pid={proc.pid})")
-        return filename
+        return filename, proc
     except Exception as e:
         print(f"VideoRecorder: Error starting ffmpeg: {e}")
-        return None
+        return None, None
 
 if __name__ == "__main__":
     # Test run

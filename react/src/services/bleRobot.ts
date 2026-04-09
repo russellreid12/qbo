@@ -176,12 +176,8 @@ export class BleRobotClient {
     return new Promise<Blob>((resolve, reject) => {
       this.clipResolve = resolve;
       this.clipReject = reject;
-      // 5-minute timeout ceiling
-      this.clipTimeout = setTimeout(() => {
-        reject(new Error('Download timed out after 5 minutes'));
-        this._resetClipState();
-        this.startHeartbeat();
-      }, 5 * 60 * 1_000);
+      // Download timeout removed as BLE transfers can be very slow.
+      // this.clipTimeout = setTimeout(() => { ... }, 5 * 60 * 1_000);
 
       this.sendCommand(`GET_CLIP:${filename}`).catch((e) => {
         reject(e);

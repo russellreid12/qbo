@@ -340,6 +340,11 @@ track_state = TRACK_SEARCHING
 track_centered_since = 0.0          # time face first appeared centered
 track_lock_threshold_sec = 0.8      # seconds centered before locking on (was 2.0 — faster engagement)
 recording_process = None
+
+_recording_target_duration = 0
+_cv_video_writer = None
+_cv_record_end_time = 0
+
 _last_servo_cmd_time = 0.0          # rate-limit servo writes to avoid overloading serial
 _servo_cmd_min_interval = 0.04      # minimum seconds between servo commands (~25 Hz cap)
 _servo_cmd_min_interval = float(config.get("faceTrackingServoInterval", _servo_cmd_min_interval))
@@ -1060,7 +1065,8 @@ def external_command_listener():
                 if line.startswith("REC_"):
                     try:
                         duration = int(line.split("_")[1])
-                        video_recorder.record_clip(duration)
+                        global _recording_target_duration
+                        _recording_target_duration = duration
                     except (IndexError, ValueError):
                         print(f"External command: invalid REC format: {line}")
                     continue
@@ -1118,6 +1124,23 @@ while True:
                _dbg_state_names.get(track_state, "??")))
 
 
+   if _recording_target_duration > 0:
+       import datetime, os
+       timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+       filename = f"/opt/qbo/recordings/clip_{timestamp}.mp4"
+       os.makedirs(os.path.dirname(filename), exist_ok=True)
+       fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+       fps = _dbg_fps_value if _dbg_fps_value > 2 else 15.0
+       global _cv_video_writer, _cv_record_end_time
+       _cv_video_writer = cv2.VideoWriter(filename, fourcc, fps, (320, 240))
+       if _cv_video_writer.isOpened():
+           _cv_record_end_time = time.time() + _recording_target_duration
+           print(f"VideoRecorder: Started OpenCV recording to {filename} for {_recording_target_duration}s")
+       else:
+           print("VideoRecorder: Failed to open cv2.VideoWriter codec")
+           _cv_video_writer = None
+       _recording_target_duration = 0
+
    faceFound = False
    _thread.start_new_thread(WaitForSpeech, ())
 
@@ -1146,6 +1169,13 @@ while True:
        _det_t0 = time.time()
        aframe = read_webcam_detection_frame(webcam)
        if aframe is not None:
+           if _cv_video_writer is not None:
+               if time.time() > _cv_record_end_time:
+                   _cv_video_writer.release()
+                   _cv_video_writer = None
+                   print("VideoRecorder: OpenCV recording finished.")
+               else:
+                   _cv_video_writer.write(aframe)
            _last_det_frame = aframe  # share with greet_face_async (avoids 2nd camera open)
            detected = detect_faces_frame(aframe)
            _dbg_last_det_ms = (time.time() - _det_t0) * 1000.0

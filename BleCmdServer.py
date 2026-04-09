@@ -35,8 +35,18 @@ def ensure_pipe(path: str) -> None:
 
 def publish_to_qbo(command: str) -> None:
     ensure_pipe(FIFO_CMD)
-    with open(FIFO_CMD, "w", encoding="utf-8") as fifo:
-        fifo.write(command + "\n")
+    try:
+        fd = os.open(FIFO_CMD, os.O_WRONLY | os.O_NONBLOCK)
+        try:
+            os.write(fd, (command + "\n").encode("utf-8"))
+            logger.info("Command written to pipe: %s", command)
+        finally:
+            os.close(fd)
+    except OSError as e:
+        if e.errno == errno.ENXIO:
+            logger.warning("pipe_cmd: no reader attached (PiFaceFast not running?), command dropped: %s", command)
+        else:
+            raise
 
 
 def parse_payload(value: bytearray) -> str:

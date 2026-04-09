@@ -5,6 +5,20 @@ export class BleRobotClient {
   private device: BluetoothDevice | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
   private heartbeatInterval: any = null;
+  private writeQueue: (() => Promise<void>)[] = [];
+  private isWriting: boolean = false;
+
+  private async processQueue() {
+    if (this.isWriting || this.writeQueue.length === 0) return;
+    this.isWriting = true;
+    try {
+      const task = this.writeQueue.shift();
+      if (task) await task();
+    } finally {
+      this.isWriting = false;
+      this.processQueue();
+    }
+  }
 
   static isSupported(): boolean {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
@@ -77,7 +91,20 @@ export class BleRobotClient {
       throw new Error('Command is empty.');
     }
 
-    await this.characteristic.writeValue(payload);
+    return new Promise<void>((resolve, reject) => {
+      this.writeQueue.push(async () => {
+        try {
+          if (!this.characteristic || !this.device?.gatt?.connected) {
+             throw new Error('Robot is not connected.');
+          }
+          await this.characteristic.writeValue(payload);
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+      this.processQueue();
+    });
   }
 
   async startRecording(): Promise<void> {

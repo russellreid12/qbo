@@ -1056,9 +1056,13 @@ def external_command_listener():
                 
                 print(f"External command received: {line}")
                 
-                # Handle special recording command
-                if line == "REC_30":
-                    video_recorder.record_clip(30)
+                # Handle recording commands e.g. REC_10, REC_30
+                if line.startswith("REC_"):
+                    try:
+                        duration = int(line.split("_")[1])
+                        video_recorder.record_clip(duration)
+                    except (IndexError, ValueError):
+                        print(f"External command: invalid REC format: {line}")
                     continue
                 
                 # Handle standard QBO command strings (e.g. -c nose -co blue)

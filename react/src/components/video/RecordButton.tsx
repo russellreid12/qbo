@@ -7,7 +7,7 @@ interface RecordButtonProps {
 
 export function RecordButton({ bleClient }: RecordButtonProps) {
   const [isRecording, setIsRecording] = useState(false);
-  const [countdown, setCountdown] = useState(30);
+  const [countdown, setCountdown] = useState(10);
 
   const handleRecord = async () => {
     if (!bleClient.isConnected()) {
@@ -18,7 +18,7 @@ export function RecordButton({ bleClient }: RecordButtonProps) {
     try {
       await bleClient.startRecording();
       setIsRecording(true);
-      setCountdown(30);
+      setCountdown(10);
     } catch (error) {
       console.error('Failed to start recording:', error);
       alert('Failed to start recording. Check console for details.');
@@ -33,7 +33,7 @@ export function RecordButton({ bleClient }: RecordButtonProps) {
       }, 1000);
     } else if (countdown === 0) {
       setIsRecording(false);
-      setCountdown(30);
+      setCountdown(10);
     }
     return () => clearInterval(interval);
   }, [isRecording, countdown]);
@@ -57,13 +57,13 @@ export function RecordButton({ bleClient }: RecordButtonProps) {
                 left: 0, 
                 height: '4px', 
                 background: 'rgba(255,255,255,0.4)',
-                width: `${(countdown / 30) * 100}%`,
+                width: `${(countdown / 10) * 100}%`,
                 transition: 'width 1s linear'
               }} 
             />
           </>
         ) : (
-          'Record 30s Clip'
+          'Record 10s Clip'
         )}
       </button>
       <p className="hint" style={{ marginTop: '8px', textAlign: 'center' }}>

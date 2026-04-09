@@ -24,7 +24,7 @@ def ensure_storage_ready():
         total_size -= size
         print(f"VideoRecorder: Storage limit reached. Deleted oldest clip: {oldest_file}")
 
-def record_clip(duration=30):
+def record_clip(duration=10):
     """
     Triggers a background ffmpeg process to record a 30s clip.
     Uses hardware acceleration (h264_v4l2m2m) for Pi efficiency.
@@ -45,7 +45,7 @@ def record_clip(duration=30):
         "-f", "v4l2", "-i", "/dev/video0",
         "-t", str(duration),
         "-c:v", "h264_v4l2m2m",
-        "-b:v", "2M",
+        "-b:v", "1M",
         filename
     ]
     

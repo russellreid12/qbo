@@ -161,6 +161,20 @@ def serial_send_tracking(fn):
             break
     _serial_queue_priority.put(fn)
 
+def _set_nose_reliable(color, retries=3, delay=0.05):
+    """Set nose color with retries, outside the serial queue system.
+    Runs on its own daemon thread so it never blocks the tracking loop or
+    starves the priority servo queue."""
+    def _do():
+        for _ in range(retries):
+            try:
+                with _serial_lock:
+                    controller.SetNoseColor(color)
+                return
+            except Exception:
+                time.sleep(delay)
+    threading.Thread(target=_do, daemon=True).start()
+
 Speak.set_controller(controller)
 # (Note: talk.set_controller will be called after assistants are initialized below)
 
@@ -335,10 +349,10 @@ Ksp = 40
 
 
 ## Head X and Y angle limits
-Xmax = 725
-Xmin = 290
-Ymax = 550
-Ymin = 420
+Xmax = 700
+Xmin = 310
+Ymax = 530
+Ymin = 425
 
 
 ## Initial head position (Y from config; X from headXPosition % or legacy 511)
@@ -630,6 +644,19 @@ pid_pan  = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
 pid_tilt = PIDController(_pid_kp, _pid_ki, _pid_kd, _pid_integral_max)
 _last_track_time = time.time()
 
+def _safe_step(current, step, soft_min, soft_max, margin=40):
+    """Taper max step as servo approaches hardware limits."""
+    if step > 0 and current > soft_max - margin:
+        t = (current - (soft_max - margin)) / margin
+        step = int(step * (1.0 - t))
+    elif step < 0 and current < soft_min + margin:
+        t = ((soft_min + margin) - current) / margin
+        step = int(step * (1.0 - t))
+    return step
+
+_tilt_sat_count = 0
+_pan_sat_count  = 0
+
 # ---------------------------------------------------------------------------
 # DNN face detector (much more accurate than Haar cascades)
 # ---------------------------------------------------------------------------
@@ -897,9 +924,11 @@ def ServoHome():
 
    Xcoor = _home_xcoor()
    Ycoor = int(Ymin + float(config["headYPosition"]) / 100 * (Ymax - Ymin))
-   controller.SetServo(2, Xcoor, int(config["servoSpeed"]))
-   time.sleep(0.1)
-   controller.SetServo(1, Ycoor, int(config["servoSpeed"]))
+   Ycoor = min(Ycoor, Ymax - 40)   # never home within 40 units of ceiling
+   Xcoor = max(Xcoor, Xmin + 40)   # never home within 40 units of pan limits
+   controller.SetServo(2, Xcoor, 30)   # slow return speed
+   time.sleep(0.2)
+   controller.SetServo(1, Ycoor, 30)
    touch_tm = time.time()
    _face_stabilize_until = time.time() + _stabilize_sec
 
@@ -1129,46 +1158,47 @@ def external_command_listener():
         try:
             # open blocks until someone writes to it
             with open(FIFO_CMD, "r") as fifo:
-                line = fifo.read().strip()
-                if not line:
-                    continue
-                
-                print(f"External command received: {line}")
-                
-                # Handle recording commands e.g. REC_10, REC_30
-                if line.startswith("REC_"):
-                    try:
-                        duration = int(line.split("_")[1])
-                        global _recording_target_duration
-                        _recording_target_duration = duration
-                    except (IndexError, ValueError):
-                        print(f"External command: invalid REC format: {line}")
-                    continue
-                
-                # Handle standard QBO command strings (e.g. -c nose -co blue)
-                # We can reuse the logic from PiCmd.py or implement a simple one here.
-                # For now, let's support basic nose and servo commands.
-                parts = line.split()
-                if "-c" in parts:
-                    cmd_idx = parts.index("-c") + 1
-                    if cmd_idx < len(parts):
-                        cmd_name = parts[cmd_idx]
-                        
-                        if cmd_name == "nose" and "-co" in parts:
-                            color_idx = parts.index("-co") + 1
-                            if color_idx < len(parts):
-                                color = parts[color_idx]
-                                colors = {"none": 0, "blue": 1, "red": 2, "green": 4}
-                                if color in colors:
-                                    _c = colors[color]
-                                    serial_send(lambda: controller.SetNoseColor(_c))
-                        
-                        elif cmd_name == "move_rel" and "-x" in parts and "-a" in parts:
-                            try:
-                                ax = int(parts[parts.index("-x") + 1])
-                                ang = int(parts[parts.index("-a") + 1])
-                                serial_send(lambda: controller.SetAngleRelative(ax, ang))
-                            except: pass
+                for line in fifo:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    print(f"External command received: {line}")
+                    
+                    # Handle recording commands e.g. REC_10, REC_30
+                    if line.startswith("REC_"):
+                        try:
+                            duration = int(line.split("_")[1])
+                            global _recording_target_duration
+                            _recording_target_duration = duration
+                        except (IndexError, ValueError):
+                            print(f"External command: invalid REC format: {line}")
+                        continue
+                    
+                    # Handle standard QBO command strings (e.g. -c nose -co blue)
+                    # We can reuse the logic from PiCmd.py or implement a simple one here.
+                    # For now, let's support basic nose and servo commands.
+                    parts = line.split()
+                    if "-c" in parts:
+                        cmd_idx = parts.index("-c") + 1
+                        if cmd_idx < len(parts):
+                            cmd_name = parts[cmd_idx]
+                            
+                            if cmd_name == "nose" and "-co" in parts:
+                                color_idx = parts.index("-co") + 1
+                                if color_idx < len(parts):
+                                    color = parts[color_idx]
+                                    colors = {"none": 0, "blue": 1, "red": 2, "green": 4}
+                                    if color in colors:
+                                        _c = colors[color]
+                                        serial_send(lambda: controller.SetNoseColor(_c))
+                            
+                            elif cmd_name == "move_rel" and "-x" in parts and "-a" in parts:
+                                try:
+                                    ax = int(parts[parts.index("-x") + 1])
+                                    ang = int(parts[parts.index("-a") + 1])
+                                    serial_send(lambda: controller.SetAngleRelative(ax, ang))
+                                except: pass
 
         except Exception as e:
             print(f"External command listener error: {e}")
@@ -1236,9 +1266,9 @@ while True:
 
 
    if HotwordListened:
-       if Listening == False:
-           if config["distro"] != "ibmwatson":
-               controller.SetNoseColor(1)
+        if Listening == False:
+            if config["distro"] != "ibmwatson":
+                _set_nose_reliable(1)
 
 
            StopHotwordListener()
@@ -1416,7 +1446,7 @@ while True:
                    track_state = TRACK_LOCKED
                    print("Face centered -> LOCKED (blue + recording)")
                    if config["distro"] != "ibmwatson":
-                       controller.SetNoseColor(1)  # Blue
+                       _set_nose_reliable(1)  # Blue
                    start_voice_recording()
            else:
                track_centered_since = 0.0  # reset if face moves off center
@@ -1473,6 +1503,28 @@ while True:
            _pan_sat = (Xcoor <= Xmin and faceOffset_X < 0) or (Xcoor >= Xmax and faceOffset_X > 0)
            _tilt_sat = (Ycoor <= Ymin and faceOffset_Y < 0) or (Ycoor >= Ymax and faceOffset_Y > 0)
 
+           if _tilt_sat:
+               _tilt_sat_count += 1
+               if _tilt_sat_count > 30:   # ~5 seconds of continuous saturation
+                   controller.SetTorqueEnable(1, 0)
+                   time.sleep(0.1)
+                   controller.SetTorqueEnable(1, 1)
+                   _tilt_sat_count = 0
+                   pid_tilt.reset()
+           else:
+               _tilt_sat_count = 0
+
+           if _pan_sat:
+               _pan_sat_count += 1
+               if _pan_sat_count > 30:
+                   controller.SetTorqueEnable(2, 0)
+                   time.sleep(0.1)
+                   controller.SetTorqueEnable(2, 1)
+                   _pan_sat_count = 0
+                   pid_pan.reset()
+           else:
+               _pan_sat_count = 0
+
            _kp_pan  = _scheduled_kp(faceOffset_X, _pid_kp)
            _kp_tilt = _scheduled_kp(faceOffset_Y, _pid_kp)
            pid_pan.kp  = _kp_pan
@@ -1489,6 +1541,7 @@ while True:
                        _smoothed_cy = raw_cy
                        print("Frame gap {:.2f}s — EMA smoother reset to raw position.".format(dt))
                    pan_step = max(-_track_max_step, min(_track_max_step, int(pan_out)))
+                   pan_step = _safe_step(Xcoor, pan_step, Xmin, Xmax)
                    Xcoor = max(Xmin, min(Xmax, Xcoor + pan_step))
                    serial_send_tracking(lambda x=Xcoor: controller.SetServo(2, x, _track_servo_speed))
                    pan_moved = True
@@ -1499,6 +1552,7 @@ while True:
                    if pan_moved:
                        time.sleep(0.01)
                    tilt_step = max(-_track_max_step, min(_track_max_step, int(tilt_out)))
+                   tilt_step = _safe_step(Ycoor, tilt_step, Ymin, Ymax)
                    Ycoor = max(Ymin, min(Ymax, Ycoor + tilt_step))
                    serial_send_tracking(lambda y=Ycoor: controller.SetServo(1, y, _track_servo_speed))
                else:

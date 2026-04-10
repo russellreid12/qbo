@@ -44,8 +44,22 @@ def ensure_pipe(path: str) -> None:
             raise
 
 
+import queue as _ble_queue_mod
+import time
+
+_pipe_queue = _ble_queue_mod.SimpleQueue()
+_last_pipe_command = ""
+_last_pipe_time = 0.0
+_pipe_debounce_sec = 0.5
+
 def _write_to_pipe(command: str) -> None:
-    """Blocking write — runs in its own thread so it never stalls the BLE event loop."""
+    global _last_pipe_command, _last_pipe_time
+    now = time.time()
+    if command == _last_pipe_command and (now - _last_pipe_time) < _pipe_debounce_sec:
+        logger.debug("Debounced duplicate command: %s", command)
+        return
+    _last_pipe_command = command
+    _last_pipe_time = now
     try:
         with open(FIFO_CMD, "w", encoding="utf-8") as fifo:
             fifo.write(command + "\n")
@@ -53,11 +67,16 @@ def _write_to_pipe(command: str) -> None:
     except OSError as e:
         logger.warning("pipe_cmd write error for '%s': %s", command, e)
 
+def _pipe_worker():
+    while True:
+        command = _pipe_queue.get()
+        _write_to_pipe(command)
+
+threading.Thread(target=_pipe_worker, daemon=True).start()
 
 def publish_to_qbo(command: str) -> None:
     ensure_pipe(FIFO_CMD)
-    t = threading.Thread(target=_write_to_pipe, args=(command,), daemon=True)
-    t.start()
+    _pipe_queue.put(command)
 
 
 def parse_payload(value: bytearray) -> str:
@@ -132,7 +151,7 @@ async def _stream_clip_async(filename: str) -> None:
                 await _notify_data(bytearray(header + chunk))
                 seq += 1
                 # Small delay so BLE stack isn't overwhelmed
-                await asyncio.sleep(0.015)
+                await asyncio.sleep(0.045)
     except Exception as e:
         logger.exception("Error streaming clip %s", filename)
         await _notify_data(bytearray(f"CLIP_ERR:{e}".encode("utf-8")))

@@ -1102,7 +1102,7 @@ def DialogflowV2SeeFace():
    global Listening
    try:
        talk.record_wav()
-       talk.detect_intent_stream()
+       talk.detect_intent_gemini_only()
    except Exception as e:
        print("DialogflowV2SeeFace error: {}".format(e))
    finally:

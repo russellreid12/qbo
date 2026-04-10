@@ -231,6 +231,39 @@ class QboDialogFlowV2(object):
         self.SpeechText(final_response)
         os.remove(self.audio_file_path)
 
+    def detect_intent_gemini_only(self):
+        """
+        STT via Google Speech Recognition, then route directly to Gemini.
+        Skips Dialogflow intent detection entirely — no cloud NLU round-trip.
+        """
+        import speech_recognition as sr
+
+        recognizer = sr.Recognizer()
+        lang = "es-ES" if self.config["language"] == "spanish" else "en-US"
+
+        try:
+            with sr.AudioFile(self.audio_file_path) as source:
+                audio = recognizer.record(source)
+            user_text = recognizer.recognize_google(audio, language=lang)
+            print("STT transcript: {}".format(user_text))
+        except sr.UnknownValueError:
+            print("STT: could not understand audio")
+            user_text = ""
+        except Exception as e:
+            print("STT error: {}".format(e))
+            user_text = ""
+        finally:
+            try:
+                os.remove(self.audio_file_path)
+            except Exception:
+                pass
+
+        if not user_text:
+            return
+
+        final_response = self._respond_gemini(user_text, fallback="Sorry, I didn't catch that.")
+        self.SpeechText(final_response)
+
     # -----------------------------------------------------------------------
     # LLM response generation
     # -----------------------------------------------------------------------

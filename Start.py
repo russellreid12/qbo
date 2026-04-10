@@ -52,8 +52,30 @@ def _enable_qbo_speaker_before_tts(cfg):
 	return False
 
 
+def wait_for_bluetooth_sink(timeout=60, poll_interval=2):
+	"""Wait until a Bluetooth audio sink appears in pactl."""
+	print("Start.py: waiting for Bluetooth audio sink...")
+	deadline = time.time() + timeout
+	while time.time() < deadline:
+		result = subprocess.run(
+			["pactl", "list", "short", "sinks"],
+			capture_output=True, text=True
+		)
+		if "bluez" in result.stdout:
+			print("Start.py: Bluetooth sink found.")
+			return True
+		time.sleep(poll_interval)
+	print("Start.py: WARNING — Bluetooth sink not found within timeout, proceeding anyway.")
+	return False
+
+
 _enable_qbo_speaker_before_tts(config)
 wait_for_audio_hardware_visible()
+
+# Only wait for BT if pulse/default/pipewire is used (where BT usually sits)
+_audio_target = str(config.get("audioPlaybackDevice") or config.get("audioPlaybackMode", "convertQBO")).lower()
+if "pulse" in _audio_target or "default" in _audio_target or "pipewire" in _audio_target:
+	wait_for_bluetooth_sink(timeout=30)
 
 if config["language"] == "spanish":
 	text = "Hola. Soy Cubo."

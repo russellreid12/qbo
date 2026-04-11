@@ -1271,17 +1271,17 @@ while True:
                 _set_nose_reliable(1)
 
 
-           StopHotwordListener()
+            StopHotwordListener()
 
 
-           if interactiveTypeGAssistant == True:
-               gassistant.start_conversation_from_face()
-           else:
-               listen_thd = talk.StartBack()
-               Listening = True
+            if interactiveTypeGAssistant == True:
+                gassistant.start_conversation_from_face()
+            else:
+                listen_thd = talk.StartBack()
+                Listening = True
 
 
-       HotwordListened = False
+        HotwordListened = False
 
 
    # --- Face detection (DNN or Haar) ---
@@ -1341,15 +1341,17 @@ while True:
            if track_state != TRACK_SEARCHING:
                print("Face lost -> SEARCHING")
                _stop_recording_if_grace_expired()
+               if config["distro"] != "ibmwatson":
+                   try:
+                       with _serial_lock:
+                           controller.SetNoseColor(0)  # Off — after recording stops
+                   except Exception:
+                       pass
                track_state = TRACK_SEARCHING
                track_centered_since = 0.0
                pid_pan.reset()
                pid_tilt.reset()
                _last_track_time = time.time()
-
-
-           if config["distro"] != "ibmwatson":
-               controller.SetNoseColor(0)  # Nose off
 
 
            if Facedet != 0:
@@ -1442,11 +1444,15 @@ while True:
                    track_centered_since = time.time()
                # Reduced threshold from 2.0s to 0.8s for faster locking
                elif time.time() - track_centered_since >= 0.8:
-                   # Lock on!
+                   # Lock on! Blue nose FIRST (synchronous), then start recording.
                    track_state = TRACK_LOCKED
                    print("Face centered -> LOCKED (blue + recording)")
                    if config["distro"] != "ibmwatson":
-                       _set_nose_reliable(1)  # Blue
+                       try:
+                           with _serial_lock:
+                               controller.SetNoseColor(1)  # Blue — blocks until sent
+                       except Exception as _ne:
+                           print("Nose blue error: {}".format(_ne))
                    start_voice_recording()
            else:
                track_centered_since = 0.0  # reset if face moves off center

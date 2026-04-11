@@ -1191,7 +1191,12 @@ def external_command_listener():
                                     colors = {"none": 0, "blue": 1, "red": 2, "green": 4}
                                     if color in colors:
                                         _c = colors[color]
-                                        serial_send(lambda: controller.SetNoseColor(_c))
+                                        # Never let an external "nose off" override
+                                        # the blue light while face is LOCKED + recording.
+                                        if _c == 0 and track_state == TRACK_LOCKED:
+                                            print("External nose-off ignored: LOCKED state active")
+                                        else:
+                                            serial_send(lambda c=_c: controller.SetNoseColor(c))
                             
                             elif cmd_name == "move_rel" and "-x" in parts and "-a" in parts:
                                 try:

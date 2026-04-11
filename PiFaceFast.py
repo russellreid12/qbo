@@ -1440,8 +1440,7 @@ while True:
 
        # ---- State machine: DETECTING -> LOCKED ----
        elif track_state == TRACK_DETECTING:
-           if config["distro"] != "ibmwatson":
-               controller.SetNoseColor(4)  # Stay green while detecting
+           pass  # Nose already set green on SEARCHING->DETECTING transition — don't spam every frame
 
 
            if face_is_centered:
@@ -1449,15 +1448,19 @@ while True:
                    track_centered_since = time.time()
                # Reduced threshold from 2.0s to 0.8s for faster locking
                elif time.time() - track_centered_since >= 0.8:
-                   # Lock on! Blue nose FIRST (synchronous), then start recording.
+                   # Lock on! Flush normal queue, then send blue via priority queue.
                    track_state = TRACK_LOCKED
                    print("Face centered -> LOCKED (blue + recording)")
                    if config["distro"] != "ibmwatson":
-                       try:
-                           with _serial_lock:
-                               controller.SetNoseColor(1)  # Blue — blocks until sent
-                       except Exception as _ne:
-                           print("Nose blue error: {}".format(_ne))
+                       # Drain the normal queue so no pending green write can follow
+                       while not _serial_queue.empty():
+                           try:
+                               _serial_queue.get_nowait()
+                               _serial_queue.task_done()
+                           except _queue_mod.Empty:
+                               break
+                       # Send blue through priority queue — jumps ahead of everything
+                       _serial_queue_priority.put(lambda: controller.SetNoseColor(1))
                    start_voice_recording()
            else:
                track_centered_since = 0.0  # reset if face moves off center

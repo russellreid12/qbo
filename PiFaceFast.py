@@ -1192,9 +1192,11 @@ def external_command_listener():
                                     if color in colors:
                                         _c = colors[color]
                                         # Never let an external "nose off" override
-                                        # the blue light while face is LOCKED + recording.
-                                        if _c == 0 and track_state == TRACK_LOCKED:
-                                            print("External nose-off ignored: LOCKED state active")
+                                        # Never let an external "nose off" override the tracking 
+                                        # status light while face is actively being followed.
+                                        if _c == 0 and track_state in (TRACK_DETECTING, TRACK_LOCKED):
+                                            print("External nose-off ignored: state={}".format(
+                                                _dbg_state_names.get(track_state, track_state)))
                                         else:
                                             serial_send(lambda c=_c: controller.SetNoseColor(c))
                             
